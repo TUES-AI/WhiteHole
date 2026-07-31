@@ -1,0 +1,25 @@
+bash_*
+*.sbatch
+logs/
+.vscode/
+checkpoint/
+*__pycache__*
+
+# Local experiment outputs and generated artifacts.
+outputs/
+wandb/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+build/
+dist/
+*.egg-info/
+
+# Large generated/downloaded environment datasets.
+pldm_envs/**/presaved_datasets/**/*.npz
+pldm_envs/**/presaved_datasets/**/*.npy
+pldm_envs/**/presaved_datasets/**/*.tar.gz
+pldm_envs/**/presaved_datasets/**/data.p
+
+# Upstream local debug renders; regenerate with pldm_envs/wall/test.py if needed.
+pldm_envs/wall/debug_output/
