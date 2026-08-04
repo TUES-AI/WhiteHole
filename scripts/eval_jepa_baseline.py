@@ -177,7 +177,9 @@ def rollout_metrics(model, batches):
         )
 
         if actions.shape[1] > 1:
-            shuffled = actions[:, torch.randperm(actions.shape[1], device=actions.device)]
+            shuffled = actions[
+                :, torch.randperm(actions.shape[1], device=actions.device)
+            ]
             shuffled_forward = model.level1.forward_posterior(states, shuffled)
             shuffled_preds = shuffled_forward.pred_output.predictions[:t]
             shuffled_action_losses.append(

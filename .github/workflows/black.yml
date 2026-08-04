@@ -1,10 +1,14 @@
-name: Lint
+name: CI
 
 on: [push, pull_request]
 
 jobs:
-  lint:
+  black:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - uses: psf/black@stable
+        with:
+          version: "24.10.0"
+          options: "--check --diff"
+          src: "."

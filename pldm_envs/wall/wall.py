@@ -197,9 +197,7 @@ class DotWall(gym.Env):
                 )
 
             start_x = start_min_x + self.rng.random() * (start_max_x - start_min_x)
-            target_x = target_min_x + self.rng.random() * (
-                target_max_x - target_min_x
-            )
+            target_x = target_min_x + self.rng.random() * (target_max_x - target_min_x)
 
             start_y = torch.tensor(
                 min_y + self.rng.random() * (max_y - min_y), device=self.device

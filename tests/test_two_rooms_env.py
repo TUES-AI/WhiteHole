@@ -26,7 +26,9 @@ class DotWallTest(unittest.TestCase):
         _, second = env.reset(seed=7)
 
         self.assertTrue(torch.equal(first["dot_position"], second["dot_position"]))
-        self.assertTrue(torch.equal(first["target_position"], second["target_position"]))
+        self.assertTrue(
+            torch.equal(first["target_position"], second["target_position"])
+        )
 
     def test_action_is_clipped_by_norm(self):
         env = self.make_env()

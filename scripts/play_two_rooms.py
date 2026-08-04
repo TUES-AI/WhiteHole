@@ -52,9 +52,13 @@ class TwoRoomsViewer:
         self.root.resizable(False, False)
 
         side = self.env.img_size * self.scale
-        self.canvas = tk.Canvas(self.root, width=side, height=side, highlightthickness=0)
+        self.canvas = tk.Canvas(
+            self.root, width=side, height=side, highlightthickness=0
+        )
         self.canvas.pack()
-        self.label = tk.Label(self.root, anchor="w", justify="left", font=("Consolas", 10))
+        self.label = tk.Label(
+            self.root, anchor="w", justify="left", font=("Consolas", 10)
+        )
         self.label.pack(fill="x", padx=8, pady=6)
 
         self.image_id = None
@@ -123,7 +127,9 @@ class TwoRoomsViewer:
         self.photo = ImageTk.PhotoImage(image)
 
         if self.image_id is None:
-            self.image_id = self.canvas.create_image(0, 0, anchor="nw", image=self.photo)
+            self.image_id = self.canvas.create_image(
+                0, 0, anchor="nw", image=self.photo
+            )
         else:
             self.canvas.itemconfig(self.image_id, image=self.photo)
 
