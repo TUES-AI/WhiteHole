@@ -6,6 +6,7 @@ from pathlib import Path
 import torch
 from tqdm.auto import tqdm
 
+from pldm.configs import omegaconf_parse_files_vals
 from pldm.data.dataset_factory import DatasetFactory
 from pldm.data.utils import make_dataloader_for_prebatched_ds
 from pldm.models.hjepa import HJEPA
@@ -215,7 +216,7 @@ def main():
     args = parse_args()
     torch.manual_seed(args.seed)
 
-    config = TrainConfig.parse_from_file(args.config)
+    config = omegaconf_parse_files_vals(TrainConfig, [args.config], [])
     config.data.num_workers = 0
     config.data.offline_wall_config.batch_size = args.batch_size
     config.data.offline_wall_config.device = "cuda"
