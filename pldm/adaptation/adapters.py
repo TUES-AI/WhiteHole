@@ -283,6 +283,13 @@ def freeze_source_model(
             param.requires_grad = False
 
 
+def set_source_model_for_adapter_train(model: torch.nn.Module):
+    """Keep weights frozen while allowing cuDNN RNN backward through inputs."""
+
+    model.eval()
+    model.level1.predictor.train()
+
+
 def make_shifted_batch(batch, normalizer, shift: str):
     if shift == "source":
         return batch
@@ -533,6 +540,7 @@ def train_adapter(config: AdapterTrainConfig):
         device=device,
     )
     freeze_source_model(model, config.freeze_backbone, config.freeze_predictor)
+    set_source_model_for_adapter_train(model)
 
     latent_dim = model.level1.repr_dim
     if config.adapter.latent_dim != latent_dim:
@@ -579,6 +587,7 @@ def train_adapter(config: AdapterTrainConfig):
 
     for epoch in range(1, config.epochs + 1):
         adapter.train()
+        set_source_model_for_adapter_train(model)
         epoch_metrics = {}
         n_steps = 0
 
