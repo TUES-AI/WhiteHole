@@ -37,17 +37,25 @@ class AdapterDataConfig(ConfigBase):
 
 @dataclass
 class AdapterObjectiveConfig(ConfigBase):
-    # Paired source/target latent alignment:
-    #   A(E(shift(x_t))) ~= E(x_t)
+    # Paper Eq. 10:
+    #   P_phi(A(z_t), a_t) ~= A(z_{t+1})
     alignment_weight: float = 1.0
 
-    # Frozen dynamics consistency:
-    #   P(A(E(shift(x_0))), a_0:h) ~= A(E(shift(x_1:h)))
+    # Paper Eq. 11:
+    #   Sum_{h=2..H} w_h || zhat_{t+h} - A(z_{t+h}) ||^2
     multistep_weight: float = 1.0
+    multistep_discount: float = 1.0
 
-    local_isometry_weight: float = 0.0
+    # Paper Eq. 4 and Eq. 12. For ConstantOffset, Llocal is exactly zero.
+    local_isometry_weight: float = 1.0
     identity_prior_weight: float = 1e-4
     horizon: int = 15
+    source_scale_epsilon: float = 1e-6
+    local_isometry_samples: int = 256
+
+    # Synthetic two-room gives source/target pairs. Keep this diagnostic
+    # available, but leave it off for proposal-style runs.
+    pair_alignment_weight: float = 0.0
 
 
 @dataclass
@@ -67,16 +75,19 @@ class AdapterTrainConfig(ConfigBase):
         "outputs/pldm/two_rooms_jepa_baseline_len17_3m/"
         "epoch=10_sample_step=2072576.ckpt"
     )
-    output_dir: str = "outputs/adaptation/two_rooms_medium"
+    output_dir: str = "outputs/adaptation/two_rooms_medium_delta_proposal_3ep"
     adapter_checkpoint_path: str = (
-        "outputs/adaptation/two_rooms_medium/adapter_latest.ckpt"
+        "outputs/adaptation/two_rooms_medium_delta_proposal_3ep/adapter_latest.ckpt"
     )
-    output_json: str = "outputs/eval/two_rooms_medium_adapter_eval.json"
+    output_json: str = (
+        "outputs/eval/two_rooms_medium_delta_proposal_3ep_adapter_eval.json"
+    )
     seed: int = 123
-    epochs: int = 5
+    epochs: int = 3
     lr: float = 1e-3
     weight_decay: float = 0.0
-    delta_init_batches: int = 64
+    delta_init_batches: int = 0
+    source_scale_batches: int = 64
     max_train_batches_per_epoch: Optional[int] = 1500
     val_batches: int = 64
     log_every_n_steps: int = 50
@@ -324,14 +335,46 @@ def dynamics_alignment_loss(
     z_tp1: Optional[torch.Tensor] = None,
     horizon: Optional[int] = None,
 ) -> torch.Tensor:
-    """Compute frozen dynamics consistency for adapted target latents."""
+    """Paper one-step intertwining loss.
 
-    del z_tp1
+    L_align = || P_phi(A(z_t), a_t) - A(z_{t+1}) ||^2
+    """
+
     adapted_z = adapter(z_t)
     steps = min(actions.shape[0], adapted_z.shape[0] - 1)
     if horizon is not None and horizon > 0:
         steps = min(steps, horizon)
     if steps <= 0:
+        return adapted_z.new_zeros(())
+
+    level1 = jepa.level1 if hasattr(jepa, "level1") else jepa
+    current = adapted_z[:steps].reshape(-1, adapted_z.shape[-1])
+    if z_tp1 is None:
+        target_next = adapted_z[1 : steps + 1].reshape(-1, adapted_z.shape[-1])
+    else:
+        target_next = adapter(z_tp1[:steps]).reshape(-1, adapted_z.shape[-1])
+    one_step_actions = actions[:steps].reshape(-1, actions.shape[-1]).unsqueeze(0)
+
+    predictions = level1.forward_prior(
+        current,
+        repr_input=True,
+        actions=one_step_actions,
+        T=1,
+    ).pred_output.predictions[1]
+    return F.mse_loss(predictions, target_next)
+
+
+def multistep_rollout_loss(
+    jepa: nn.Module,
+    adapted_z: torch.Tensor,
+    actions: torch.Tensor,
+    horizon: int,
+    discount: float = 1.0,
+) -> torch.Tensor:
+    """Paper multi-step rollout loss, starting at h=2."""
+
+    steps = min(actions.shape[0], adapted_z.shape[0] - 1, horizon)
+    if steps < 2:
         return adapted_z.new_zeros(())
 
     level1 = jepa.level1 if hasattr(jepa, "level1") else jepa
@@ -341,18 +384,96 @@ def dynamics_alignment_loss(
         actions=actions[:steps],
         T=steps,
     ).pred_output.predictions
-    return F.mse_loss(predictions[1 : steps + 1], adapted_z[1 : steps + 1])
+
+    losses = []
+    weights = []
+    for h in range(2, steps + 1):
+        losses.append(F.mse_loss(predictions[h], adapted_z[h], reduction="none"))
+        weights.append(discount ** (h - 2))
+
+    horizon_losses = torch.stack([loss.mean() for loss in losses])
+    horizon_weights = horizon_losses.new_tensor(weights)
+    horizon_weights = horizon_weights / horizon_weights.sum().clamp_min(1e-12)
+    return (horizon_losses * horizon_weights).sum()
 
 
-def local_isometry_loss(adapter: nn.Module, z: torch.Tensor) -> torch.Tensor:
-    """Constant offsets preserve local distances exactly."""
+def local_isometry_loss(
+    adapter: nn.Module,
+    z: torch.Tensor,
+    n_samples: int = 256,
+) -> torch.Tensor:
+    """Hutchinson estimate of ||J_A^T J_A - I||_F^2.
 
-    del adapter
-    return z.new_zeros(())
+    Constant offsets preserve distances exactly, so their value is zero.
+    """
+
+    if isinstance(adapter, AppearanceAdapter):
+        if adapter.config.family == AdapterFamily.ConstantOffset:
+            return z.new_zeros(())
+
+    flat_z = z.detach().reshape(-1, z.shape[-1])
+    if n_samples > 0 and flat_z.shape[0] > n_samples:
+        idx = torch.randperm(flat_z.shape[0], device=flat_z.device)[:n_samples]
+        flat_z = flat_z[idx]
+
+    flat_z = flat_z.requires_grad_(True)
+    v = torch.randn_like(flat_z)
+
+    def apply_adapter(inp):
+        return adapter(inp)
+
+    _adapted, jvp = torch.autograd.functional.jvp(
+        apply_adapter,
+        flat_z,
+        v,
+        create_graph=True,
+    )
+    adapted = adapter(flat_z)
+    vjp = torch.autograd.grad(
+        adapted,
+        flat_z,
+        grad_outputs=jvp,
+        create_graph=True,
+        retain_graph=True,
+    )[0]
+    return (vjp - v).pow(2).sum(dim=-1).mean()
 
 
-def identity_prior_loss(adapter: nn.Module, z: torch.Tensor) -> torch.Tensor:
-    return (adapter(z) - z).pow(2).mean()
+def identity_prior_loss(
+    adapter: nn.Module,
+    z: torch.Tensor,
+    source_latent_scale: torch.Tensor,
+    epsilon: float,
+) -> torch.Tensor:
+    residual = adapter(z) - z
+    residual_scale = residual.pow(2).sum(dim=-1).mean()
+    return residual_scale / (source_latent_scale.to(z.device) + epsilon)
+
+
+@torch.no_grad()
+def estimate_source_latent_scale(
+    model: torch.nn.Module,
+    loader,
+    device: torch.device,
+    n_batches: int,
+) -> torch.Tensor:
+    if n_batches <= 0:
+        return torch.tensor(1.0, device=device)
+
+    scales = []
+    iterator = iter(loader)
+    for _ in tqdm(range(n_batches), desc="Estimating source latent scale"):
+        try:
+            batch = next(iterator)
+        except StopIteration:
+            iterator = iter(loader)
+            batch = next(iterator)
+
+        states, _actions, _locations = batch_to_device_time_major(batch, device)
+        source_z = encode_states(model, states).reshape(-1, model.level1.repr_dim)
+        scales.append(source_z.pow(2).sum(dim=-1).mean())
+
+    return torch.stack(scales).mean().detach()
 
 
 def compute_losses(
@@ -363,6 +484,7 @@ def compute_losses(
     appearance_shift: str,
     objective_config: AdapterObjectiveConfig,
     device: torch.device,
+    source_latent_scale: torch.Tensor,
 ):
     target_batch = make_shifted_batch(source_batch, normalizer, appearance_shift)
     source_states, actions, _locations = batch_to_device_time_major(
@@ -378,26 +500,50 @@ def compute_losses(
     adapted_z = adapter(target_z)
     t = min(source_z.shape[0], adapted_z.shape[0])
 
-    alignment = F.mse_loss(adapted_z[:t], source_z[:t])
-    multistep = dynamics_alignment_loss(
-        adapter=lambda z: z,
+    alignment = dynamics_alignment_loss(
+        adapter=adapter,
         jepa=model,
-        z_t=adapted_z[:t],
+        z_t=target_z[:t],
         actions=actions[: max(0, t - 1)],
         horizon=objective_config.horizon,
     )
-    local_iso = local_isometry_loss(adapter, target_z[:t])
-    identity_prior = identity_prior_loss(adapter, target_z[:t])
+    multistep = multistep_rollout_loss(
+        jepa=model,
+        adapted_z=adapted_z[:t],
+        actions=actions[: max(0, t - 1)],
+        horizon=objective_config.horizon,
+        discount=objective_config.multistep_discount,
+    )
+    local_iso = local_isometry_loss(
+        adapter,
+        target_z[:t],
+        n_samples=objective_config.local_isometry_samples,
+    )
+    identity_prior = identity_prior_loss(
+        adapter,
+        target_z[:t],
+        source_latent_scale=source_latent_scale,
+        epsilon=objective_config.source_scale_epsilon,
+    )
+    pair_alignment = F.mse_loss(adapted_z[:t], source_z[:t])
 
     total = (
         objective_config.alignment_weight * alignment
         + objective_config.multistep_weight * multistep
         + objective_config.local_isometry_weight * local_iso
         + objective_config.identity_prior_weight * identity_prior
+        + objective_config.pair_alignment_weight * pair_alignment
     )
 
     with torch.no_grad():
-        unadapted_alignment = F.mse_loss(target_z[:t], source_z[:t])
+        unadapted_pair_alignment = F.mse_loss(target_z[:t], source_z[:t])
+        unadapted_dynamics_alignment = dynamics_alignment_loss(
+            adapter=lambda z: z,
+            jepa=model,
+            z_t=target_z[:t],
+            actions=actions[: max(0, t - 1)],
+            horizon=objective_config.horizon,
+        )
 
     metrics = {
         "loss": total,
@@ -405,7 +551,10 @@ def compute_losses(
         "multistep_loss": multistep.detach(),
         "local_isometry_loss": local_iso.detach(),
         "identity_prior_loss": identity_prior.detach(),
-        "unadapted_alignment_loss": unadapted_alignment.detach(),
+        "pair_alignment_loss": pair_alignment.detach(),
+        "unadapted_pair_alignment_loss": unadapted_pair_alignment.detach(),
+        "unadapted_dynamics_alignment_loss": unadapted_dynamics_alignment.detach(),
+        "source_latent_scale": source_latent_scale.detach(),
     }
     return total, metrics
 
@@ -466,6 +615,7 @@ def evaluate_loss_batches(
     objective_config: AdapterObjectiveConfig,
     device: torch.device,
     n_batches: int,
+    source_latent_scale: torch.Tensor,
 ):
     adapter.eval()
     totals = {}
@@ -486,6 +636,7 @@ def evaluate_loss_batches(
             appearance_shift=appearance_shift,
             objective_config=objective_config,
             device=device,
+            source_latent_scale=source_latent_scale,
         )
         for key, value in metrics.items():
             totals.setdefault(f"val/{key}", []).append(value.item())
@@ -551,6 +702,12 @@ def train_adapter(config: AdapterTrainConfig):
         config.adapter.latent_dim = latent_dim
 
     adapter = AppearanceAdapter(config.adapter).to(device)
+    source_latent_scale = estimate_source_latent_scale(
+        model=model,
+        loader=train_loader,
+        device=device,
+        n_batches=config.source_scale_batches,
+    )
     init_metrics = initialize_delta_from_pairs(
         model=model,
         adapter=adapter,
@@ -578,6 +735,7 @@ def train_adapter(config: AdapterTrainConfig):
                 "train_batches_per_epoch": len(train_loader),
                 "max_train_batches_per_epoch": config.max_train_batches_per_epoch,
                 "val_batches": config.val_batches,
+                "source_latent_scale": source_latent_scale.item(),
                 **init_metrics,
                 **adapter.delta_stats(),
             },
@@ -608,6 +766,7 @@ def train_adapter(config: AdapterTrainConfig):
                 appearance_shift=config.data.appearance_shift,
                 objective_config=config.objectives,
                 device=device,
+                source_latent_scale=source_latent_scale,
             )
 
             optimizer.zero_grad(set_to_none=True)
@@ -649,6 +808,7 @@ def train_adapter(config: AdapterTrainConfig):
             objective_config=config.objectives,
             device=device,
             n_batches=config.val_batches,
+            source_latent_scale=source_latent_scale,
         )
         epoch_report = {
             "epoch": epoch,

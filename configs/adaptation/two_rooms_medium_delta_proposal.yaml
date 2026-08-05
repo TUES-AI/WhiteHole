@@ -1,0 +1,50 @@
+source_config_path: configs/two_rooms_baseline_jepa.yaml
+source_checkpoint_path: outputs/pldm/two_rooms_jepa_baseline_len17_3m/epoch=10_sample_step=2072576.ckpt
+output_dir: outputs/adaptation/two_rooms_medium_delta_proposal_3ep
+adapter_checkpoint_path: outputs/adaptation/two_rooms_medium_delta_proposal_3ep/adapter_latest.ckpt
+output_json: outputs/eval/two_rooms_medium_delta_proposal_3ep_adapter_eval.json
+seed: 123
+epochs: 3
+lr: 0.001
+weight_decay: 0.0
+delta_init_batches: 0
+source_scale_batches: 64
+max_train_batches_per_epoch: 1500
+val_batches: 64
+log_every_n_steps: 50
+save_every_n_epochs: 1
+gradient_clip_norm: 1.0
+freeze_backbone: true
+freeze_predictor: true
+probe_train_batches: 48
+probe_val_batches: 16
+probe_steps: 400
+rollout_batches: 32
+
+data:
+  source_data_path: outputs/data/two_rooms_len17_3m.npz
+  target_data_path: null
+  appearance_shift: medium
+  batch_size: 64
+  n_steps: 16
+  num_workers: 0
+  device: cuda
+
+adapter:
+  family: AdapterFamily.ConstantOffset
+  latent_dim: 512
+  rank: 16
+  hidden_dim: 512
+  n_layers: 2
+  zero_init: true
+
+objectives:
+  alignment_weight: 1.0
+  multistep_weight: 1.0
+  multistep_discount: 1.0
+  local_isometry_weight: 1.0
+  identity_prior_weight: 0.0001
+  horizon: 15
+  source_scale_epsilon: 0.000001
+  local_isometry_samples: 256
+  pair_alignment_weight: 0.0

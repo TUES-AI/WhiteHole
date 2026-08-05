@@ -3,6 +3,7 @@ from pldm.adaptation.adapters import (
     dynamics_alignment_loss,
     identity_prior_loss,
     local_isometry_loss,
+    multistep_rollout_loss,
 )
 
 __all__ = [
@@ -10,4 +11,5 @@ __all__ = [
     "dynamics_alignment_loss",
     "identity_prior_loss",
     "local_isometry_loss",
+    "multistep_rollout_loss",
 ]

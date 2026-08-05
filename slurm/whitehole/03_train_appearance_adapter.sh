@@ -31,19 +31,26 @@ module load nvidia/cuda/12
 
 PROJECT_DIR="/valhalla/projects/${SLURM_JOB_ACCOUNT}/WhiteHole"
 VIRTUAL_ENV="/valhalla/projects/${SLURM_JOB_ACCOUNT}/conda_envs/torch"
-CONFIG="${CONFIG:-configs/adaptation/two_rooms_medium_adapter.yaml}"
+CONFIG="${CONFIG:-configs/adaptation/two_rooms_medium_delta_proposal.yaml}"
 CHECKPOINT="${CHECKPOINT:-outputs/pldm/two_rooms_jepa_baseline_len17_3m/epoch=10_sample_step=2072576.ckpt}"
 DATA_PATH="${DATA_PATH:-outputs/data/two_rooms_len17_3m.npz}"
-OUTPUT_DIR="${OUTPUT_DIR:-outputs/adaptation/two_rooms_medium}"
+OUTPUT_DIR="${OUTPUT_DIR:-outputs/adaptation/two_rooms_medium_delta_proposal_3ep}"
 OUTPUT_DIR="${OUTPUT_DIR%/}"
 APPEARANCE_SHIFT="${APPEARANCE_SHIFT:-medium}"
-EPOCHS="${EPOCHS:-5}"
+EPOCHS="${EPOCHS:-3}"
 MAX_TRAIN_BATCHES_PER_EPOCH="${MAX_TRAIN_BATCHES_PER_EPOCH:-1500}"
-DELTA_INIT_BATCHES="${DELTA_INIT_BATCHES:-64}"
+DELTA_INIT_BATCHES="${DELTA_INIT_BATCHES:-0}"
+SOURCE_SCALE_BATCHES="${SOURCE_SCALE_BATCHES:-64}"
 VAL_BATCHES="${VAL_BATCHES:-64}"
 BATCH_SIZE="${BATCH_SIZE:-64}"
 NUM_WORKERS="${NUM_WORKERS:-0}"
 HORIZON="${HORIZON:-15}"
+ALIGNMENT_WEIGHT="${ALIGNMENT_WEIGHT:-1.0}"
+MULTISTEP_WEIGHT="${MULTISTEP_WEIGHT:-1.0}"
+MULTISTEP_DISCOUNT="${MULTISTEP_DISCOUNT:-1.0}"
+LOCAL_ISOMETRY_WEIGHT="${LOCAL_ISOMETRY_WEIGHT:-1.0}"
+IDENTITY_PRIOR_WEIGHT="${IDENTITY_PRIOR_WEIGHT:-0.0001}"
+PAIR_ALIGNMENT_WEIGHT="${PAIR_ALIGNMENT_WEIGHT:-0.0}"
 INSTALL_DEPS="${INSTALL_DEPS:-true}"
 AUTO_EVAL="${AUTO_EVAL:-1}"
 EVAL_SCRIPT="${EVAL_SCRIPT:-slurm/whitehole/04_eval_appearance_adapter.sh}"
@@ -151,12 +158,19 @@ python -m pldm.adaptation.train \
         epochs="${EPOCHS}" \
         max_train_batches_per_epoch="${MAX_TRAIN_BATCHES_PER_EPOCH}" \
         delta_init_batches="${DELTA_INIT_BATCHES}" \
+        source_scale_batches="${SOURCE_SCALE_BATCHES}" \
         val_batches="${VAL_BATCHES}" \
         data.source_data_path="${DATA_PATH}" \
         data.appearance_shift="${APPEARANCE_SHIFT}" \
         data.batch_size="${BATCH_SIZE}" \
         data.num_workers="${NUM_WORKERS}" \
-        objectives.horizon="${HORIZON}"
+        objectives.horizon="${HORIZON}" \
+        objectives.alignment_weight="${ALIGNMENT_WEIGHT}" \
+        objectives.multistep_weight="${MULTISTEP_WEIGHT}" \
+        objectives.multistep_discount="${MULTISTEP_DISCOUNT}" \
+        objectives.local_isometry_weight="${LOCAL_ISOMETRY_WEIGHT}" \
+        objectives.identity_prior_weight="${IDENTITY_PRIOR_WEIGHT}" \
+        objectives.pair_alignment_weight="${PAIR_ALIGNMENT_WEIGHT}"
 
 T1=$(date +%s)
 ELAPSED=$((T1 - T0))
