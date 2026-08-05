@@ -6,6 +6,9 @@
 #
 # Quick test:
 #   EPOCHS=1 MAX_TRAIN_BATCHES_PER_EPOCH=50 VAL_BATCHES=8 sbatch ...
+#
+# AUTO_EVAL=1 submits slurm/whitehole/04_eval_appearance_adapter.sh after a
+# successful train, using ${OUTPUT_DIR}/adapter_latest.ckpt.
 
 #SBATCH --partition=common
 #SBATCH --qos=bg-eng-01
@@ -32,6 +35,7 @@ CONFIG="${CONFIG:-configs/adaptation/two_rooms_medium_adapter.yaml}"
 CHECKPOINT="${CHECKPOINT:-outputs/pldm/two_rooms_jepa_baseline_len17_3m/epoch=10_sample_step=2072576.ckpt}"
 DATA_PATH="${DATA_PATH:-outputs/data/two_rooms_len17_3m.npz}"
 OUTPUT_DIR="${OUTPUT_DIR:-outputs/adaptation/two_rooms_medium}"
+OUTPUT_DIR="${OUTPUT_DIR%/}"
 APPEARANCE_SHIFT="${APPEARANCE_SHIFT:-medium}"
 EPOCHS="${EPOCHS:-5}"
 MAX_TRAIN_BATCHES_PER_EPOCH="${MAX_TRAIN_BATCHES_PER_EPOCH:-1500}"
@@ -41,6 +45,11 @@ BATCH_SIZE="${BATCH_SIZE:-64}"
 NUM_WORKERS="${NUM_WORKERS:-0}"
 HORIZON="${HORIZON:-15}"
 INSTALL_DEPS="${INSTALL_DEPS:-true}"
+AUTO_EVAL="${AUTO_EVAL:-1}"
+EVAL_SCRIPT="${EVAL_SCRIPT:-slurm/whitehole/04_eval_appearance_adapter.sh}"
+RUN_NAME="${OUTPUT_DIR##*/}"
+EVAL_ADAPTER_CHECKPOINT="${EVAL_ADAPTER_CHECKPOINT:-${OUTPUT_DIR}/adapter_latest.ckpt}"
+EVAL_OUTPUT_JSON="${EVAL_OUTPUT_JSON:-outputs/eval/${RUN_NAME}_adapter_eval.json}"
 
 [ -d "${PROJECT_DIR}" ] || { echo "Missing project dir: ${PROJECT_DIR}"; exit 1; }
 [ -d "${VIRTUAL_ENV}" ] || { echo "Missing venv: ${VIRTUAL_ENV}"; exit 1; }
@@ -157,4 +166,28 @@ echo "===================================================="
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] WhiteHole appearance adapter train DONE"
 echo "  elapsed: ${ELAPSED} s = $((ELAPSED / 60)) min"
 echo "  output_dir=${OUTPUT_DIR}"
+echo "  auto_eval=${AUTO_EVAL}"
+echo "  eval_output_json=${EVAL_OUTPUT_JSON}"
 echo "===================================================="
+
+if [ "${AUTO_EVAL}" = "1" ] || [ "${AUTO_EVAL}" = "true" ]; then
+    [ -f "${EVAL_ADAPTER_CHECKPOINT}" ] || {
+        echo "Missing adapter checkpoint for eval: ${EVAL_ADAPTER_CHECKPOINT}"
+        exit 1
+    }
+
+    echo ""
+    echo "Submitting adapter eval job..."
+    CONFIG="${CONFIG}" \
+    CHECKPOINT="${CHECKPOINT}" \
+    ADAPTER_CHECKPOINT="${EVAL_ADAPTER_CHECKPOINT}" \
+    DATA_PATH="${DATA_PATH}" \
+    APPEARANCE_SHIFT="${APPEARANCE_SHIFT}" \
+    OUTPUT_JSON="${EVAL_OUTPUT_JSON}" \
+    BATCH_SIZE="${BATCH_SIZE}" \
+    NUM_WORKERS="${NUM_WORKERS}" \
+    sbatch "${EVAL_SCRIPT}"
+else
+    echo ""
+    echo "AUTO_EVAL=${AUTO_EVAL}; skipping adapter eval submission."
+fi
