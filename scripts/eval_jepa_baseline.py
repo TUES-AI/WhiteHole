@@ -11,6 +11,7 @@ from pldm.data.dataset_factory import DatasetFactory
 from pldm.data.utils import make_dataloader_for_prebatched_ds
 from pldm.models.hjepa import HJEPA
 from pldm.train import TrainConfig
+from pldm_envs.wall.appearance import APPEARANCE_SHIFTS, apply_appearance_shift
 from pldm_envs.wall.data.wall import WallDataset
 
 
@@ -35,6 +36,15 @@ def parse_args():
     parser.add_argument("--probe-val-batches", type=int, default=16)
     parser.add_argument("--probe-steps", type=int, default=400)
     parser.add_argument("--rollout-batches", type=int, default=32)
+    parser.add_argument(
+        "--eval-appearance-shift",
+        choices=APPEARANCE_SHIFTS,
+        default="source",
+        help=(
+            "Appearance shift applied to eval observations before source "
+            "normalization. The source probe is still trained on unshifted latents."
+        ),
+    )
     parser.add_argument("--seed", type=int, default=123)
     return parser.parse_args()
 
@@ -49,6 +59,19 @@ def take_batches(loader, n_batches, desc):
             iterator = iter(loader)
             batches.append(next(iterator))
     return batches
+
+
+def apply_shift_to_batches(batches, normalizer, shift):
+    if shift == "source":
+        return batches
+
+    shifted_batches = []
+    for batch in batches:
+        unnormalized_states = normalizer.unnormalize_state(batch.states)
+        shifted_states = apply_appearance_shift(unnormalized_states, shift)
+        normalized_states = normalizer.normalize_state(shifted_states)
+        shifted_batches.append(batch._replace(states=normalized_states))
+    return shifted_batches
 
 
 def build_model(config, sample, checkpoint_path):
@@ -255,13 +278,21 @@ def main():
         max(args.probe_val_batches, args.rollout_batches),
         "Collecting eval batches",
     )
+    shifted_val_batches = apply_shift_to_batches(
+        val_batches,
+        normalizer=normalizer,
+        shift=args.eval_appearance_shift,
+    )
 
     train_z, train_loc = encode_locations(model, train_batches)
-    val_z, val_loc = encode_locations(model, val_batches[: args.probe_val_batches])
+    val_z, val_loc = encode_locations(
+        model, shifted_val_batches[: args.probe_val_batches]
+    )
 
     report = {
         "checkpoint": args.checkpoint,
         "config": args.config,
+        "eval_appearance_shift": args.eval_appearance_shift,
         "num_parameters": sum(p.numel() for p in model.parameters()),
         "probe_train_samples": int(train_z.shape[0]),
         "probe_val_samples": int(val_z.shape[0]),
@@ -276,7 +307,7 @@ def main():
             steps=args.probe_steps,
         )
     )
-    report.update(rollout_metrics(model, val_batches[: args.rollout_batches]))
+    report.update(rollout_metrics(model, shifted_val_batches[: args.rollout_batches]))
 
     output_path = Path(args.output_json)
     output_path.parent.mkdir(parents=True, exist_ok=True)

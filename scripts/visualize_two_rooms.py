@@ -10,19 +10,23 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from pldm_envs.wall.appearance import APPEARANCE_SHIFTS, apply_appearance_shift
 from pldm_envs.wall.wall import DotWall
 
 
-def compose_frame(obs, target_obs):
+def compose_frame(obs, target_obs, target_overlay_obs=None):
     obs = obs.detach().cpu().numpy()
     target_obs = target_obs.detach().cpu().numpy()
+    if target_overlay_obs is not None:
+        target_overlay_obs = target_overlay_obs.detach().cpu().numpy()
 
     agent = obs[0].astype(np.float32) / 255.0
     walls = obs[1].astype(np.float32) / 255.0
-    target = target_obs[0].astype(np.float32) / 255.0
+    target_source = target_overlay_obs if target_overlay_obs is not None else target_obs
+    target = target_source[0].astype(np.float32) / 255.0
 
     frame = np.ones((*agent.shape, 3), dtype=np.float32) * 245.0
-    frame[walls > 0] = np.array([35.0, 35.0, 35.0])
+    frame[walls > 0.08] = np.array([35.0, 35.0, 35.0])
     frame[..., 1] = np.maximum(frame[..., 1], target * 220.0)
     frame[..., 0] = np.maximum(frame[..., 0], agent * 255.0)
     frame[..., 1] *= 1.0 - agent * 0.5
@@ -67,6 +71,12 @@ def main():
     parser.add_argument("--steps", type=int, default=120)
     parser.add_argument("--fps", type=int, default=12)
     parser.add_argument(
+        "--appearance-shift",
+        choices=APPEARANCE_SHIFTS,
+        default="source",
+        help="Render the source observation or an appearance-shifted target view.",
+    )
+    parser.add_argument(
         "--policy",
         choices=["heuristic", "random"],
         default="heuristic",
@@ -81,7 +91,10 @@ def main():
     obs, info = env.reset(seed=args.seed)
     target_obs = info["target_obs"]
 
-    frames = [compose_frame(obs, target_obs)]
+    shifted_obs = apply_appearance_shift(obs, args.appearance_shift)
+    shifted_target_obs = apply_appearance_shift(target_obs, args.appearance_shift)
+
+    frames = [compose_frame(shifted_obs, shifted_target_obs, target_obs)]
     imageio.imwrite(output_dir / "initial.png", frames[0])
 
     done = truncated = False
@@ -98,12 +111,19 @@ def main():
             action = action_toward(env, waypoints[0])
 
         obs, _, done, truncated, info = env.step(action)
-        frames.append(compose_frame(obs, info["target_obs"]))
+        shifted_obs = apply_appearance_shift(obs, args.appearance_shift)
+        shifted_target_obs = apply_appearance_shift(
+            info["target_obs"], args.appearance_shift
+        )
+        frames.append(
+            compose_frame(shifted_obs, shifted_target_obs, info["target_obs"])
+        )
         if done or truncated:
             break
 
     imageio.mimsave(output_dir / "rollout.gif", frames, fps=args.fps)
 
+    print(f"Appearance shift: {args.appearance_shift}")
     print(f"Wrote {output_dir / 'initial.png'}")
     print(f"Wrote {output_dir / 'rollout.gif'}")
     print(f"Final position: {info['dot_position'].detach().cpu().numpy().round(2)}")

@@ -28,7 +28,8 @@ VIRTUAL_ENV="/valhalla/projects/${SLURM_JOB_ACCOUNT}/conda_envs/torch"
 
 CONFIG="${CONFIG:-configs/two_rooms_baseline_jepa.yaml}"
 CHECKPOINT="${CHECKPOINT:-outputs/pldm/two_rooms_jepa_baseline_len17_3m/epoch=10_sample_step=2072576.ckpt}"
-OUTPUT_JSON="${OUTPUT_JSON:-outputs/eval/two_rooms_jepa_baseline_eval.json}"
+EVAL_APPEARANCE_SHIFT="${EVAL_APPEARANCE_SHIFT:-source}"
+OUTPUT_JSON="${OUTPUT_JSON:-outputs/eval/two_rooms_jepa_baseline_${EVAL_APPEARANCE_SHIFT}_eval.json}"
 
 [ -d "${PROJECT_DIR}" ] || { echo "Missing project dir: ${PROJECT_DIR}"; exit 1; }
 [ -d "${VIRTUAL_ENV}" ] || { echo "Missing venv: ${VIRTUAL_ENV}"; exit 1; }
@@ -66,13 +67,15 @@ echo "[$(date '+%Y-%m-%d %H:%M:%S')] WhiteHole JEPA eval"
 echo "  config=${CONFIG}"
 echo "  checkpoint=${CHECKPOINT}"
 echo "  output_json=${OUTPUT_JSON}"
+echo "  eval_appearance_shift=${EVAL_APPEARANCE_SHIFT}"
 echo "===================================================="
 echo ""
 
 python scripts/eval_jepa_baseline.py \
     --config "${CONFIG}" \
     --checkpoint "${CHECKPOINT}" \
-    --output-json "${OUTPUT_JSON}"
+    --output-json "${OUTPUT_JSON}" \
+    --eval-appearance-shift "${EVAL_APPEARANCE_SHIFT}"
 
 echo ""
 echo "Wrote ${OUTPUT_JSON}"
