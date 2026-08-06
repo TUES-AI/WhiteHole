@@ -32,6 +32,8 @@ EVAL_SCRIPT="${EVAL_SCRIPT:-slurm/whitehole/04_eval_appearance_adapter.sh}"
 OUTPUT_ROOT="${OUTPUT_ROOT:-outputs/adaptation}"
 EVAL_OUTPUT_ROOT="${EVAL_OUTPUT_ROOT:-outputs/eval}"
 CHAIN="${CHAIN:-1}"
+TRAIN_TIME="${TRAIN_TIME:-00:20:00}"
+EVAL_TIME="${EVAL_TIME:-00:10:00}"
 
 previous_job=""
 
@@ -70,7 +72,7 @@ for weight in ${PAIR_ALIGNMENT_WEIGHTS}; do
         IDENTITY_PRIOR_WEIGHT="${IDENTITY_PRIOR_WEIGHT}" \
         PAIR_ALIGNMENT_WEIGHT="${weight}" \
         AUTO_EVAL=0 \
-        sbatch --parsable "${dependency_args[@]}" "${TRAIN_SCRIPT}"
+        sbatch --parsable --time="${TRAIN_TIME}" "${dependency_args[@]}" "${TRAIN_SCRIPT}"
     )
 
     eval_id=$(
@@ -82,7 +84,7 @@ for weight in ${PAIR_ALIGNMENT_WEIGHTS}; do
         OUTPUT_JSON="${output_json}" \
         BATCH_SIZE="${BATCH_SIZE}" \
         NUM_WORKERS="${NUM_WORKERS}" \
-        sbatch --parsable --dependency="afterok:${train_id}" "${EVAL_SCRIPT}"
+        sbatch --parsable --time="${EVAL_TIME}" --dependency="afterok:${train_id}" "${EVAL_SCRIPT}"
     )
 
     printf "pair_alignment_weight=%s train_job=%s eval_job=%s output_dir=%s eval_json=%s\n" \
