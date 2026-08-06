@@ -56,6 +56,10 @@ class AdapterObjectiveConfig(ConfigBase):
     # Synthetic two-room gives source/target pairs. Keep this diagnostic
     # available, but leave it off for proposal-style runs.
     pair_alignment_weight: float = 0.0
+    source_identity_weight: float = 0.0
+    variance_alignment_weight: float = 0.0
+    covariance_alignment_weight: float = 0.0
+    covariance_samples: int = 512
 
 
 @dataclass
@@ -67,6 +71,8 @@ class AppearanceAdapterConfig(ConfigBase):
     n_layers: int = 2
     zero_init: bool = True
     diagonal_scale_epsilon: float = 0.5
+    residual_scale: float = 1.0
+    use_layer_norm: bool = True
 
 
 @dataclass
@@ -120,6 +126,10 @@ class AppearanceAdapter(torch.nn.Module):
     The first higher-capacity adapter is a diagonal affine map:
 
         A(z_target) = (1 + epsilon * tanh(scale_logits)) * z_target + delta
+
+    LowRank and MLP are residual maps:
+
+        A(z_target) = z_target + delta + residual_scale * f(z_target)
     """
 
     def __init__(self, config: AppearanceAdapterConfig):
@@ -129,10 +139,12 @@ class AppearanceAdapter(torch.nn.Module):
         if config.family not in (
             AdapterFamily.ConstantOffset,
             AdapterFamily.DiagonalAffine,
+            AdapterFamily.LowRank,
+            AdapterFamily.MLP,
         ):
             raise NotImplementedError(
-                "This adapter file currently implements ConstantOffset and "
-                "DiagonalAffine."
+                "This adapter file currently implements ConstantOffset, "
+                "DiagonalAffine, LowRank, and MLP."
             )
 
         self.delta = nn.Parameter(torch.zeros(config.latent_dim))
@@ -144,9 +156,42 @@ class AppearanceAdapter(torch.nn.Module):
             if not config.zero_init:
                 nn.init.normal_(self.scale_logits, mean=0.0, std=0.02)
 
+        if config.family == AdapterFamily.LowRank:
+            self.low_rank_down = nn.Linear(config.latent_dim, config.rank, bias=False)
+            self.low_rank_up = nn.Linear(config.rank, config.latent_dim, bias=False)
+            if config.zero_init:
+                nn.init.zeros_(self.low_rank_up.weight)
+
+        if config.family == AdapterFamily.MLP:
+            layers = []
+            if config.use_layer_norm:
+                layers.append(nn.LayerNorm(config.latent_dim))
+
+            hidden_dim = int(config.hidden_dim)
+            n_hidden = max(1, int(config.n_layers) - 1)
+            in_dim = config.latent_dim
+            for _ in range(n_hidden):
+                layers.append(nn.Linear(in_dim, hidden_dim))
+                layers.append(nn.SiLU())
+                in_dim = hidden_dim
+
+            final = nn.Linear(in_dim, config.latent_dim)
+            if config.zero_init:
+                nn.init.zeros_(final.weight)
+                nn.init.zeros_(final.bias)
+            layers.append(final)
+            self.residual_mlp = nn.Sequential(*layers)
+
     def diagonal_scale(self) -> torch.Tensor:
         epsilon = float(self.config.diagonal_scale_epsilon)
         return 1.0 + epsilon * self.scale_logits.tanh()
+
+    def residual(self, z: torch.Tensor) -> torch.Tensor:
+        if self.config.family == AdapterFamily.LowRank:
+            return self.low_rank_up(self.low_rank_down(z))
+        if self.config.family == AdapterFamily.MLP:
+            return self.residual_mlp(z)
+        return torch.zeros_like(z)
 
     def forward(self, z: torch.Tensor) -> torch.Tensor:
         """Map target-domain latents into source-compatible coordinates."""
@@ -155,8 +200,11 @@ class AppearanceAdapter(torch.nn.Module):
         if self.config.family == AdapterFamily.ConstantOffset:
             return z + delta
 
-        scale = self.diagonal_scale().view(*([1] * (z.ndim - 1)), -1)
-        return z * scale + delta
+        if self.config.family == AdapterFamily.DiagonalAffine:
+            scale = self.diagonal_scale().view(*([1] * (z.ndim - 1)), -1)
+            return z * scale + delta
+
+        return z + delta + float(self.config.residual_scale) * self.residual(z)
 
     @torch.no_grad()
     def set_delta(self, delta: torch.Tensor):
@@ -185,6 +233,16 @@ class AppearanceAdapter(torch.nn.Module):
                         "scale_logits_l2": self.scale_logits.detach().norm().item(),
                     }
                 )
+            residual_params = [
+                param.detach().flatten()
+                for name, param in self.named_parameters()
+                if name != "delta"
+            ]
+            if residual_params:
+                stats["residual_param_l2"] = torch.cat(residual_params).norm().item()
+            stats["adapter_trainable_parameters"] = sum(
+                p.numel() for p in self.parameters() if p.requires_grad
+            )
             return stats
 
 
@@ -445,6 +503,14 @@ def local_isometry_loss(
         if adapter.config.family == AdapterFamily.DiagonalAffine:
             scale = adapter.diagonal_scale()
             return (scale.pow(2) - 1.0).pow(2).sum()
+        if adapter.config.family == AdapterFamily.LowRank:
+            latent_dim = adapter.config.latent_dim
+            weight = torch.eye(latent_dim, device=z.device, dtype=z.dtype)
+            low_rank = adapter.low_rank_up.weight @ adapter.low_rank_down.weight
+            weight = weight + float(adapter.config.residual_scale) * low_rank
+            gram = weight.T @ weight
+            identity = torch.eye(latent_dim, device=z.device, dtype=z.dtype)
+            return (gram - identity).pow(2).sum()
 
     flat_z = z.detach().reshape(-1, z.shape[-1])
     if n_samples > 0 and flat_z.shape[0] > n_samples:
@@ -483,6 +549,42 @@ def identity_prior_loss(
     residual = adapter(z) - z
     residual_scale = residual.pow(2).sum(dim=-1).mean()
     return residual_scale / (source_latent_scale.to(z.device) + epsilon)
+
+
+def source_identity_loss(adapter: nn.Module, source_z: torch.Tensor) -> torch.Tensor:
+    return F.mse_loss(adapter(source_z), source_z)
+
+
+def distribution_alignment_losses(
+    adapted_z: torch.Tensor,
+    source_z: torch.Tensor,
+    n_samples: int = 512,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    adapted_flat = adapted_z.reshape(-1, adapted_z.shape[-1])
+    source_flat = source_z.reshape(-1, source_z.shape[-1])
+    n = min(adapted_flat.shape[0], source_flat.shape[0])
+    adapted_flat = adapted_flat[:n]
+    source_flat = source_flat[:n].detach()
+
+    if n_samples > 0 and n > n_samples:
+        idx = torch.randperm(n, device=adapted_flat.device)[:n_samples]
+        adapted_flat = adapted_flat[idx]
+        source_flat = source_flat[idx]
+
+    adapted_std = adapted_flat.std(dim=0, unbiased=False)
+    source_std = source_flat.std(dim=0, unbiased=False)
+    variance_loss = F.mse_loss(adapted_std, source_std)
+
+    if adapted_flat.shape[0] < 2:
+        return variance_loss, adapted_flat.new_zeros(())
+
+    adapted_centered = adapted_flat - adapted_flat.mean(dim=0, keepdim=True)
+    source_centered = source_flat - source_flat.mean(dim=0, keepdim=True)
+    denom = adapted_flat.shape[0] - 1
+    adapted_cov = adapted_centered.T @ adapted_centered / denom
+    source_cov = source_centered.T @ source_centered / denom
+    covariance_loss = F.mse_loss(adapted_cov, source_cov)
+    return variance_loss, covariance_loss
 
 
 @torch.no_grad()
@@ -549,11 +651,15 @@ def compute_losses(
         horizon=objective_config.horizon,
         discount=objective_config.multistep_discount,
     )
-    local_iso = local_isometry_loss(
-        adapter,
-        target_z[:t],
-        n_samples=objective_config.local_isometry_samples,
-    )
+    zero_loss = adapted_z.new_zeros(())
+    if objective_config.local_isometry_weight:
+        local_iso = local_isometry_loss(
+            adapter,
+            target_z[:t],
+            n_samples=objective_config.local_isometry_samples,
+        )
+    else:
+        local_iso = zero_loss
     identity_prior = identity_prior_loss(
         adapter,
         target_z[:t],
@@ -561,6 +667,23 @@ def compute_losses(
         epsilon=objective_config.source_scale_epsilon,
     )
     pair_alignment = F.mse_loss(adapted_z[:t], source_z[:t])
+    if objective_config.source_identity_weight:
+        source_identity = source_identity_loss(adapter, source_z[:t])
+    else:
+        source_identity = zero_loss
+
+    if (
+        objective_config.variance_alignment_weight
+        or objective_config.covariance_alignment_weight
+    ):
+        variance_alignment, covariance_alignment = distribution_alignment_losses(
+            adapted_z[:t],
+            source_z[:t],
+            n_samples=objective_config.covariance_samples,
+        )
+    else:
+        variance_alignment = zero_loss
+        covariance_alignment = zero_loss
 
     total = (
         objective_config.alignment_weight * alignment
@@ -568,6 +691,9 @@ def compute_losses(
         + objective_config.local_isometry_weight * local_iso
         + objective_config.identity_prior_weight * identity_prior
         + objective_config.pair_alignment_weight * pair_alignment
+        + objective_config.source_identity_weight * source_identity
+        + objective_config.variance_alignment_weight * variance_alignment
+        + objective_config.covariance_alignment_weight * covariance_alignment
     )
 
     with torch.no_grad():
@@ -587,6 +713,9 @@ def compute_losses(
         "local_isometry_loss": local_iso.detach(),
         "identity_prior_loss": identity_prior.detach(),
         "pair_alignment_loss": pair_alignment.detach(),
+        "source_identity_loss": source_identity.detach(),
+        "variance_alignment_loss": variance_alignment.detach(),
+        "covariance_alignment_loss": covariance_alignment.detach(),
         "unadapted_pair_alignment_loss": unadapted_pair_alignment.detach(),
         "unadapted_dynamics_alignment_loss": unadapted_dynamics_alignment.detach(),
         "source_latent_scale": source_latent_scale.detach(),
