@@ -59,7 +59,8 @@ max_rollout = float(
     os.environ.get("MAX_ACCEPTABLE_ROLLOUT_RATIO", "${MAX_ACCEPTABLE_ROLLOUT_RATIO}")
 )
 
-best = None
+rows = []
+passing = []
 for tag in tags:
     path = os.path.join(eval_root, f"{prefix}_{tag}_3ep_adapter_eval.json")
     if not os.path.exists(path):
@@ -75,20 +76,35 @@ for tag in tags:
         f"delta_tag={tag} adapted_rmse={rmse:.4f} "
         f"rollout_ratio={rollout:.4f} pair_after={pair_after:.4f}"
     )
-    row = (rmse, rollout, tag, pair_after)
-    if best is None or (rmse, rollout) < (best[0], best[1]):
-        best = row
+    row = {
+        "tag": tag,
+        "rmse": rmse,
+        "rollout": rollout,
+        "pair_after": pair_after,
+    }
+    rows.append(row)
+    if rmse <= max_rmse and rollout < max_rollout:
+        passing.append(row)
 
-if best is None:
+if not rows:
     print("No delta eval files found; running diagonal-affine follow-up.")
     raise SystemExit(2)
 
-rmse, rollout, tag, pair_after = best
+best = min(rows, key=lambda row: (row["rmse"], row["rollout"]))
 print(
-    f"best_delta_tag={tag} best_rmse={rmse:.4f} "
-    f"best_rollout_ratio={rollout:.4f} best_pair_after={pair_after:.4f}"
+    f"best_delta_tag={best['tag']} best_rmse={best['rmse']:.4f} "
+    f"best_rollout_ratio={best['rollout']:.4f} "
+    f"best_pair_after={best['pair_after']:.4f}"
 )
-if rmse <= max_rmse and rollout < max_rollout:
+
+if passing:
+    best_passing = min(passing, key=lambda row: (row["rmse"], row["rollout"]))
+    print(
+        f"passing_delta_tag={best_passing['tag']} "
+        f"passing_rmse={best_passing['rmse']:.4f} "
+        f"passing_rollout_ratio={best_passing['rollout']:.4f} "
+        f"passing_pair_after={best_passing['pair_after']:.4f}"
+    )
     print("Strong delta-anchor sweep met the target; skipping diagonal-affine.")
     raise SystemExit(0)
 
