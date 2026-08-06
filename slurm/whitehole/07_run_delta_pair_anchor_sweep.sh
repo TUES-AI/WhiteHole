@@ -42,6 +42,8 @@ TRAIN_SCRIPT="${TRAIN_SCRIPT:-slurm/whitehole/03_train_appearance_adapter.sh}"
 EVAL_SCRIPT="${EVAL_SCRIPT:-slurm/whitehole/04_eval_appearance_adapter.sh}"
 OUTPUT_ROOT="${OUTPUT_ROOT:-outputs/adaptation}"
 EVAL_OUTPUT_ROOT="${EVAL_OUTPUT_ROOT:-outputs/eval}"
+RUN_PREFIX="${RUN_PREFIX:-two_rooms_medium_delta_pairw}"
+RUN_SUFFIX="${RUN_SUFFIX:-3ep}"
 
 [ -d "${PROJECT_DIR}" ] || { echo "Missing project dir: ${PROJECT_DIR}"; exit 1; }
 
@@ -51,12 +53,14 @@ mkdir -p logs "${OUTPUT_ROOT}" "${EVAL_OUTPUT_ROOT}"
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting delta pair-anchor sweep"
 echo "  weights=${PAIR_ALIGNMENT_WEIGHTS}"
 echo "  epochs=${EPOCHS}"
+echo "  run_prefix=${RUN_PREFIX}"
+echo "  run_suffix=${RUN_SUFFIX}"
 echo "  gpu=${CUDA_VISIBLE_DEVICES:-unset}"
 
 for weight in ${PAIR_ALIGNMENT_WEIGHTS}; do
     tag="${weight//./d}"
     tag="${tag//-/m}"
-    run_name="two_rooms_medium_delta_pairw_${tag}_3ep"
+    run_name="${RUN_PREFIX}_${tag}_${RUN_SUFFIX}"
     output_dir="${OUTPUT_ROOT}/${run_name}"
     output_json="${EVAL_OUTPUT_ROOT}/${run_name}_adapter_eval.json"
 

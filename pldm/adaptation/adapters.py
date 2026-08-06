@@ -112,31 +112,46 @@ class AdapterEvalConfig(AdapterTrainConfig):
 class AppearanceAdapter(torch.nn.Module):
     """Target-latent -> source-latent appearance adapter.
 
-    The first test uses the classical delta-vector model:
+    The delta-vector ablation uses:
 
         A(z_target) = z_target + delta
 
-    The other enum values are kept for the later separated implementation, but
-    only ConstantOffset is trained in this file.
+    The first higher-capacity adapter is a diagonal affine map:
+
+        A(z_target) = exp(log_scale) * z_target + delta
     """
 
     def __init__(self, config: AppearanceAdapterConfig):
         super().__init__()
         self.config = config
 
-        if config.family != AdapterFamily.ConstantOffset:
+        if config.family not in (
+            AdapterFamily.ConstantOffset,
+            AdapterFamily.DiagonalAffine,
+        ):
             raise NotImplementedError(
-                "This first test only implements AdapterFamily.ConstantOffset."
+                "This adapter file currently implements ConstantOffset and "
+                "DiagonalAffine."
             )
 
         self.delta = nn.Parameter(torch.zeros(config.latent_dim))
         if not config.zero_init:
             nn.init.normal_(self.delta, mean=0.0, std=0.02)
 
+        if config.family == AdapterFamily.DiagonalAffine:
+            self.log_scale = nn.Parameter(torch.zeros(config.latent_dim))
+            if not config.zero_init:
+                nn.init.normal_(self.log_scale, mean=0.0, std=0.02)
+
     def forward(self, z: torch.Tensor) -> torch.Tensor:
         """Map target-domain latents into source-compatible coordinates."""
 
-        return z + self.delta.view(*([1] * (z.ndim - 1)), -1)
+        delta = self.delta.view(*([1] * (z.ndim - 1)), -1)
+        if self.config.family == AdapterFamily.ConstantOffset:
+            return z + delta
+
+        scale = self.log_scale.exp().view(*([1] * (z.ndim - 1)), -1)
+        return z * scale + delta
 
     @torch.no_grad()
     def set_delta(self, delta: torch.Tensor):
@@ -149,11 +164,23 @@ class AppearanceAdapter(torch.nn.Module):
     def delta_stats(self):
         with torch.no_grad():
             delta = self.delta.detach()
-            return {
+            stats = {
                 "delta_l2": delta.norm().item(),
                 "delta_mean_abs": delta.abs().mean().item(),
                 "delta_max_abs": delta.abs().max().item(),
             }
+            if hasattr(self, "log_scale"):
+                scale = self.log_scale.detach().exp()
+                stats.update(
+                    {
+                        "scale_mean": scale.mean().item(),
+                        "scale_std": scale.std(unbiased=False).item(),
+                        "scale_min": scale.min().item(),
+                        "scale_max": scale.max().item(),
+                        "log_scale_l2": self.log_scale.detach().norm().item(),
+                    }
+                )
+            return stats
 
 
 def seed_everything(seed: int):
