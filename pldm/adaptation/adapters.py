@@ -437,6 +437,9 @@ def local_isometry_loss(
     if isinstance(adapter, AppearanceAdapter):
         if adapter.config.family == AdapterFamily.ConstantOffset:
             return z.new_zeros(())
+        if adapter.config.family == AdapterFamily.DiagonalAffine:
+            scale = adapter.log_scale.exp()
+            return (scale.pow(2) - 1.0).pow(2).sum()
 
     flat_z = z.detach().reshape(-1, z.shape[-1])
     if n_samples > 0 and flat_z.shape[0] > n_samples:

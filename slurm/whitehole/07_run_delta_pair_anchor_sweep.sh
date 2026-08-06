@@ -1,5 +1,5 @@
 #!/bin/bash
-# Run the delta pair-anchor sweep inside one Slurm allocation.
+# Run a pair-anchor adapter sweep inside one Slurm allocation.
 #
 # Submit from /valhalla/projects/bg-eng-01/WhiteHole:
 #   sbatch slurm/whitehole/07_run_delta_pair_anchor_sweep.sh
@@ -50,7 +50,7 @@ RUN_SUFFIX="${RUN_SUFFIX:-3ep}"
 cd "${PROJECT_DIR}"
 mkdir -p logs "${OUTPUT_ROOT}" "${EVAL_OUTPUT_ROOT}"
 
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting delta pair-anchor sweep"
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting pair-anchor adapter sweep"
 echo "  weights=${PAIR_ALIGNMENT_WEIGHTS}"
 echo "  epochs=${EPOCHS}"
 echo "  run_prefix=${RUN_PREFIX}"
@@ -105,4 +105,4 @@ for weight in ${PAIR_ALIGNMENT_WEIGHTS}; do
 done
 
 echo ""
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Delta pair-anchor sweep DONE"
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Pair-anchor adapter sweep DONE"
