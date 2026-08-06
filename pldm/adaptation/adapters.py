@@ -512,32 +512,33 @@ def local_isometry_loss(
             identity = torch.eye(latent_dim, device=z.device, dtype=z.dtype)
             return (gram - identity).pow(2).sum()
 
-    flat_z = z.detach().reshape(-1, z.shape[-1])
-    if n_samples > 0 and flat_z.shape[0] > n_samples:
-        idx = torch.randperm(flat_z.shape[0], device=flat_z.device)[:n_samples]
-        flat_z = flat_z[idx]
+    with torch.enable_grad():
+        flat_z = z.detach().reshape(-1, z.shape[-1])
+        if n_samples > 0 and flat_z.shape[0] > n_samples:
+            idx = torch.randperm(flat_z.shape[0], device=flat_z.device)[:n_samples]
+            flat_z = flat_z[idx]
 
-    flat_z = flat_z.requires_grad_(True)
-    v = torch.randn_like(flat_z)
+        flat_z = flat_z.requires_grad_(True)
+        v = torch.randn_like(flat_z)
 
-    def apply_adapter(inp):
-        return adapter(inp)
+        def apply_adapter(inp):
+            return adapter(inp)
 
-    _adapted, jvp = torch.autograd.functional.jvp(
-        apply_adapter,
-        flat_z,
-        v,
-        create_graph=True,
-    )
-    adapted = adapter(flat_z)
-    vjp = torch.autograd.grad(
-        adapted,
-        flat_z,
-        grad_outputs=jvp,
-        create_graph=True,
-        retain_graph=True,
-    )[0]
-    return (vjp - v).pow(2).sum(dim=-1).mean()
+        _adapted, jvp = torch.autograd.functional.jvp(
+            apply_adapter,
+            flat_z,
+            v,
+            create_graph=True,
+        )
+        adapted = adapter(flat_z)
+        vjp = torch.autograd.grad(
+            adapted,
+            flat_z,
+            grad_outputs=jvp,
+            create_graph=True,
+            retain_graph=True,
+        )[0]
+        return (vjp - v).pow(2).sum(dim=-1).mean()
 
 
 def identity_prior_loss(

@@ -23,6 +23,8 @@ PROJECT_DIR="/valhalla/projects/${SLURM_JOB_ACCOUNT}/WhiteHole"
 SWEEP_SCRIPT="${SWEEP_SCRIPT:-slurm/whitehole/07_run_delta_pair_anchor_sweep.sh}"
 SUMMARY_JSON="${SUMMARY_JSON:-outputs/eval/capacity_adapters/capacity_summary.json}"
 SUMMARY_CSV="${SUMMARY_CSV:-outputs/eval/capacity_adapters/capacity_summary.csv}"
+RUN_LOWRANK="${RUN_LOWRANK:-1}"
+RUN_MLP="${RUN_MLP:-1}"
 
 [ -d "${PROJECT_DIR}" ] || { echo "Missing project dir: ${PROJECT_DIR}"; exit 1; }
 
@@ -32,58 +34,68 @@ mkdir -p logs outputs/eval/capacity_adapters
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting capacity adapter sweep"
 echo "  summary_json=${SUMMARY_JSON}"
 echo "  summary_csv=${SUMMARY_CSV}"
+echo "  run_lowrank=${RUN_LOWRANK}"
+echo "  run_mlp=${RUN_MLP}"
 
-echo ""
-echo "===================================================="
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Low-rank residual adapter"
-echo "===================================================="
+if [ "${RUN_LOWRANK}" = "1" ] || [ "${RUN_LOWRANK}" = "true" ]; then
+    echo ""
+    echo "===================================================="
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Low-rank residual adapter"
+    echo "===================================================="
 
-CONFIG="configs/adaptation/two_rooms_medium_lowrank.yaml" \
-PAIR_ALIGNMENT_WEIGHTS="0.3 1.0 3.0" \
-EPOCHS=3 \
-LR=0.0003 \
-WEIGHT_DECAY=0.000001 \
-MAX_TRAIN_BATCHES_PER_EPOCH=1000 \
-DELTA_INIT_BATCHES=64 \
-SOURCE_SCALE_BATCHES=64 \
-VAL_BATCHES=64 \
-LOCAL_ISOMETRY_WEIGHT=0.01 \
-LOCAL_ISOMETRY_SAMPLES=128 \
-SOURCE_IDENTITY_WEIGHT=0.1 \
-VARIANCE_ALIGNMENT_WEIGHT=0.1 \
-COVARIANCE_ALIGNMENT_WEIGHT=0.01 \
-COVARIANCE_SAMPLES=512 \
-OUTPUT_ROOT="outputs/adaptation/capacity_adapters/lowrank_r32" \
-EVAL_OUTPUT_ROOT="outputs/eval/capacity_adapters/lowrank_r32" \
-RUN_PREFIX="two_rooms_medium_lowrank_pairw" \
-RUN_SUFFIX="3ep" \
-bash "${SWEEP_SCRIPT}"
+    CONFIG="configs/adaptation/two_rooms_medium_lowrank.yaml" \
+    PAIR_ALIGNMENT_WEIGHTS="0.3 1.0 3.0" \
+    EPOCHS=3 \
+    LR=0.0003 \
+    WEIGHT_DECAY=0.000001 \
+    MAX_TRAIN_BATCHES_PER_EPOCH=1000 \
+    DELTA_INIT_BATCHES=64 \
+    SOURCE_SCALE_BATCHES=64 \
+    VAL_BATCHES=64 \
+    LOCAL_ISOMETRY_WEIGHT=0.01 \
+    LOCAL_ISOMETRY_SAMPLES=128 \
+    SOURCE_IDENTITY_WEIGHT=0.1 \
+    VARIANCE_ALIGNMENT_WEIGHT=0.1 \
+    COVARIANCE_ALIGNMENT_WEIGHT=0.01 \
+    COVARIANCE_SAMPLES=512 \
+    OUTPUT_ROOT="outputs/adaptation/capacity_adapters/lowrank_r32" \
+    EVAL_OUTPUT_ROOT="outputs/eval/capacity_adapters/lowrank_r32" \
+    RUN_PREFIX="two_rooms_medium_lowrank_pairw" \
+    RUN_SUFFIX="3ep" \
+    bash "${SWEEP_SCRIPT}"
+else
+    echo "RUN_LOWRANK=${RUN_LOWRANK}; skipping low-rank residual adapter."
+fi
 
-echo ""
-echo "===================================================="
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Residual MLP adapter"
-echo "===================================================="
+if [ "${RUN_MLP}" = "1" ] || [ "${RUN_MLP}" = "true" ]; then
+    echo ""
+    echo "===================================================="
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Residual MLP adapter"
+    echo "===================================================="
 
-CONFIG="configs/adaptation/two_rooms_medium_residual_mlp.yaml" \
-PAIR_ALIGNMENT_WEIGHTS="0.3 1.0 3.0" \
-EPOCHS=3 \
-LR=0.0003 \
-WEIGHT_DECAY=0.000001 \
-MAX_TRAIN_BATCHES_PER_EPOCH=500 \
-DELTA_INIT_BATCHES=64 \
-SOURCE_SCALE_BATCHES=64 \
-VAL_BATCHES=64 \
-LOCAL_ISOMETRY_WEIGHT=0.005 \
-LOCAL_ISOMETRY_SAMPLES=64 \
-SOURCE_IDENTITY_WEIGHT=0.1 \
-VARIANCE_ALIGNMENT_WEIGHT=0.1 \
-COVARIANCE_ALIGNMENT_WEIGHT=0.01 \
-COVARIANCE_SAMPLES=512 \
-OUTPUT_ROOT="outputs/adaptation/capacity_adapters/mlp_h256" \
-EVAL_OUTPUT_ROOT="outputs/eval/capacity_adapters/mlp_h256" \
-RUN_PREFIX="two_rooms_medium_mlp_pairw" \
-RUN_SUFFIX="3ep" \
-bash "${SWEEP_SCRIPT}"
+    CONFIG="configs/adaptation/two_rooms_medium_residual_mlp.yaml" \
+    PAIR_ALIGNMENT_WEIGHTS="0.3 1.0 3.0" \
+    EPOCHS=3 \
+    LR=0.0003 \
+    WEIGHT_DECAY=0.000001 \
+    MAX_TRAIN_BATCHES_PER_EPOCH=500 \
+    DELTA_INIT_BATCHES=64 \
+    SOURCE_SCALE_BATCHES=64 \
+    VAL_BATCHES=64 \
+    LOCAL_ISOMETRY_WEIGHT=0.005 \
+    LOCAL_ISOMETRY_SAMPLES=64 \
+    SOURCE_IDENTITY_WEIGHT=0.1 \
+    VARIANCE_ALIGNMENT_WEIGHT=0.1 \
+    COVARIANCE_ALIGNMENT_WEIGHT=0.01 \
+    COVARIANCE_SAMPLES=512 \
+    OUTPUT_ROOT="outputs/adaptation/capacity_adapters/mlp_h256" \
+    EVAL_OUTPUT_ROOT="outputs/eval/capacity_adapters/mlp_h256" \
+    RUN_PREFIX="two_rooms_medium_mlp_pairw" \
+    RUN_SUFFIX="3ep" \
+    bash "${SWEEP_SCRIPT}"
+else
+    echo "RUN_MLP=${RUN_MLP}; skipping residual MLP adapter."
+fi
 
 echo ""
 echo "===================================================="
