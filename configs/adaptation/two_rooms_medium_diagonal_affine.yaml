@@ -37,6 +37,7 @@ adapter:
   hidden_dim: 512
   n_layers: 2
   zero_init: true
+  diagonal_scale_epsilon: 0.5
 
 objectives:
   alignment_weight: 1.0

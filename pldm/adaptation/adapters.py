@@ -66,6 +66,7 @@ class AppearanceAdapterConfig(ConfigBase):
     hidden_dim: int = 512
     n_layers: int = 2
     zero_init: bool = True
+    diagonal_scale_epsilon: float = 0.5
 
 
 @dataclass
@@ -118,7 +119,7 @@ class AppearanceAdapter(torch.nn.Module):
 
     The first higher-capacity adapter is a diagonal affine map:
 
-        A(z_target) = exp(log_scale) * z_target + delta
+        A(z_target) = (1 + epsilon * tanh(scale_logits)) * z_target + delta
     """
 
     def __init__(self, config: AppearanceAdapterConfig):
@@ -139,9 +140,13 @@ class AppearanceAdapter(torch.nn.Module):
             nn.init.normal_(self.delta, mean=0.0, std=0.02)
 
         if config.family == AdapterFamily.DiagonalAffine:
-            self.log_scale = nn.Parameter(torch.zeros(config.latent_dim))
+            self.scale_logits = nn.Parameter(torch.zeros(config.latent_dim))
             if not config.zero_init:
-                nn.init.normal_(self.log_scale, mean=0.0, std=0.02)
+                nn.init.normal_(self.scale_logits, mean=0.0, std=0.02)
+
+    def diagonal_scale(self) -> torch.Tensor:
+        epsilon = float(self.config.diagonal_scale_epsilon)
+        return 1.0 + epsilon * self.scale_logits.tanh()
 
     def forward(self, z: torch.Tensor) -> torch.Tensor:
         """Map target-domain latents into source-compatible coordinates."""
@@ -150,7 +155,7 @@ class AppearanceAdapter(torch.nn.Module):
         if self.config.family == AdapterFamily.ConstantOffset:
             return z + delta
 
-        scale = self.log_scale.exp().view(*([1] * (z.ndim - 1)), -1)
+        scale = self.diagonal_scale().view(*([1] * (z.ndim - 1)), -1)
         return z * scale + delta
 
     @torch.no_grad()
@@ -169,15 +174,15 @@ class AppearanceAdapter(torch.nn.Module):
                 "delta_mean_abs": delta.abs().mean().item(),
                 "delta_max_abs": delta.abs().max().item(),
             }
-            if hasattr(self, "log_scale"):
-                scale = self.log_scale.detach().exp()
+            if hasattr(self, "scale_logits"):
+                scale = self.diagonal_scale().detach()
                 stats.update(
                     {
                         "scale_mean": scale.mean().item(),
                         "scale_std": scale.std(unbiased=False).item(),
                         "scale_min": scale.min().item(),
                         "scale_max": scale.max().item(),
-                        "log_scale_l2": self.log_scale.detach().norm().item(),
+                        "scale_logits_l2": self.scale_logits.detach().norm().item(),
                     }
                 )
             return stats
@@ -438,7 +443,7 @@ def local_isometry_loss(
         if adapter.config.family == AdapterFamily.ConstantOffset:
             return z.new_zeros(())
         if adapter.config.family == AdapterFamily.DiagonalAffine:
-            scale = adapter.log_scale.exp()
+            scale = adapter.diagonal_scale()
             return (scale.pow(2) - 1.0).pow(2).sum()
 
     flat_z = z.detach().reshape(-1, z.shape[-1])
