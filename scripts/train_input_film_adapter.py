@@ -19,11 +19,11 @@ from pldm.adaptation.adapters import (
     build_source_model,
     freeze_source_model,
     jsonable,
-    make_shifted_batch,
     resolve_device,
     seed_everything,
     take_batches,
 )
+from pldm_envs.wall.appearance import apply_appearance_shift
 
 
 class InputChannelAffine(nn.Module):
@@ -143,6 +143,14 @@ def flatten_time_batch(z):
     return z.reshape(-1, z.shape[-1])
 
 
+def shift_states_on_device(states, normalizer, shift):
+    if shift == "source":
+        return states
+    unnormalized_states = normalizer.unnormalize_state(states)
+    shifted_states = apply_appearance_shift(unnormalized_states, shift)
+    return normalizer.normalize_state(shifted_states)
+
+
 def distribution_losses(adapted_z, source_z):
     adapted = flatten_time_batch(adapted_z)
     source = flatten_time_batch(source_z).detach()
@@ -198,11 +206,7 @@ def identity_loss(adapter):
 
 def compute_losses(model, input_adapter, batch, normalizer, shift, args, device):
     source_states, actions, _locations = batch_to_device_time_major(batch, device)
-    target_batch = make_shifted_batch(batch, normalizer, shift)
-    target_states, _target_actions, _target_locations = batch_to_device_time_major(
-        target_batch,
-        device,
-    )
+    target_states = shift_states_on_device(source_states, normalizer, shift)
 
     with torch.no_grad():
         source_z = encode_states(model, source_states)
@@ -279,9 +283,8 @@ def encode_locations(model, batches, normalizer, shift, device, input_adapter=No
     zs = []
     locs = []
     for batch in tqdm(batches, desc="Encoding eval locations"):
-        if shift != "source":
-            batch = make_shifted_batch(batch, normalizer, shift)
         states, _actions, locations = batch_to_device_time_major(batch, device)
+        states = shift_states_on_device(states, normalizer, shift)
         if input_adapter is not None:
             states = input_adapter(states)
         z = encode_states(model, states)
@@ -334,11 +337,7 @@ def paired_and_rollout_eval(model, input_adapter, batches, normalizer, shift, de
 
     for batch in tqdm(batches, desc="Evaluating input adapter"):
         source_states, actions, _locations = batch_to_device_time_major(batch, device)
-        target_batch = make_shifted_batch(batch, normalizer, shift)
-        target_states, _target_actions, _target_locations = batch_to_device_time_major(
-            target_batch,
-            device,
-        )
+        target_states = shift_states_on_device(source_states, normalizer, shift)
 
         source_z = encode_states(model, source_states)
         target_z = encode_states(model, target_states)
@@ -503,6 +502,7 @@ def main():
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     output_dir.joinpath("config.json").write_text(json.dumps(vars(args), indent=2) + "\n")
+    print(json.dumps({"event": "setup_start", "appearance_shift": args.appearance_shift}))
 
     data_config = AdapterDataConfig(
         source_data_path=args.data_path,
@@ -516,14 +516,25 @@ def main():
         data_config=data_config,
         val_batches=max(args.val_batches, args.probe_val_batches),
     )
+    print(
+        json.dumps(
+            {
+                "event": "dataloaders_ready",
+                "train_batches": len(train_loader),
+                "val_batches": len(val_loader),
+            }
+        )
+    )
     sample = next(iter(train_loader))
     channels = sample.states.shape[-3]
+    print(json.dumps({"event": "sample_ready", "channels": channels}))
     model = build_source_model(
         baseline_config=baseline_config,
         sample=sample,
         checkpoint_path=args.source_checkpoint,
         device=device,
     )
+    print(json.dumps({"event": "source_model_ready"}))
     freeze_source_model(model, freeze_backbone=True, freeze_predictor=True)
     model.eval()
     model.level1.predictor.train()
