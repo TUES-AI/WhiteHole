@@ -98,16 +98,16 @@ def apply_appearance_shift(
         wall_edges = (walls_thick - walls_blur).abs()
 
         shifted_agent = (
-            0.20 * agent
-            + 0.55 * agent_blur
+            0.35 * walls_thick * (0.35 + 0.65 * stripe)
             + 0.25 * wall_edges
-            + (16.0 / 255.0 * scale) * texture
+            + 0.10 * agent_halo
+            + (18.0 / 255.0 * scale) * texture
         )
         shifted_walls = (
-            0.45 * walls_blur
-            + 0.45 * walls_thick * (0.45 + 0.55 * stripe)
-            + 0.20 * agent_halo
-            + (12.0 / 255.0 * scale) * texture
+            0.65 * agent_blur
+            + 0.20 * agent
+            + 0.10 * walls_blur
+            + (14.0 / 255.0 * scale) * texture
         )
 
     shifted = torch.stack([shifted_agent, shifted_walls], dim=-3).clamp(0, scale)
