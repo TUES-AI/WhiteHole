@@ -1,5 +1,5 @@
 #!/bin/bash
-# Train a tiny input-channel FiLM/affine adapter before the frozen JEPA encoder.
+# Train a small input adapter before the frozen JEPA encoder.
 #
 # Submit from /valhalla/projects/bg-eng-01/WhiteHole:
 #   sbatch slurm/whitehole/12_train_input_film_adapter.sh
@@ -27,7 +27,8 @@ PROJECT_DIR="/valhalla/projects/${SLURM_JOB_ACCOUNT}/WhiteHole"
 VIRTUAL_ENV="/valhalla/projects/${SLURM_JOB_ACCOUNT}/conda_envs/torch"
 
 APPEARANCE_SHIFT="${APPEARANCE_SHIFT:-medium}"
-RUN_NAME="${RUN_NAME:-two_rooms_${APPEARANCE_SHIFT}_input_affine_3ep}"
+ADAPTER_FAMILY="${ADAPTER_FAMILY:-affine}"
+RUN_NAME="${RUN_NAME:-two_rooms_${APPEARANCE_SHIFT}_input_${ADAPTER_FAMILY}_3ep}"
 DATA_PATH="${DATA_PATH:-outputs/data/two_rooms_len17_3m.npz}"
 OUTPUT_DIR="${OUTPUT_DIR:-outputs/adaptation/input_film/${RUN_NAME}}"
 EVAL_JSON="${EVAL_JSON:-outputs/eval/input_film/${RUN_NAME}_eval.json}"
@@ -42,6 +43,10 @@ VARIANCE_WEIGHT="${VARIANCE_WEIGHT:-1.0}"
 COVARIANCE_WEIGHT="${COVARIANCE_WEIGHT:-0.05}"
 IDENTITY_WEIGHT="${IDENTITY_WEIGHT:-0.001}"
 IMAGE_PAIR_WEIGHT="${IMAGE_PAIR_WEIGHT:-0.0}"
+CONV_HIDDEN_CHANNELS="${CONV_HIDDEN_CHANNELS:-16}"
+CONV_LAYERS="${CONV_LAYERS:-3}"
+CONV_RESIDUAL_SCALE="${CONV_RESIDUAL_SCALE:-1.0}"
+CONV_ZERO_INIT="${CONV_ZERO_INIT:-true}"
 
 [ -d "${PROJECT_DIR}" ] || { echo "Missing project dir: ${PROJECT_DIR}"; exit 1; }
 [ -d "${VIRTUAL_ENV}" ] || { echo "Missing venv: ${VIRTUAL_ENV}"; exit 1; }
@@ -74,6 +79,7 @@ echo ""
 echo "===================================================="
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Input FiLM encoder-adaptation control"
 echo "  appearance_shift=${APPEARANCE_SHIFT}"
+echo "  adapter_family=${ADAPTER_FAMILY}"
 echo "  data_path=${DATA_PATH}"
 echo "  output_dir=${OUTPUT_DIR}"
 echo "  eval_json=${EVAL_JSON}"
@@ -84,6 +90,10 @@ echo "===================================================="
 
 python scripts/train_input_film_adapter.py \
     --appearance-shift "${APPEARANCE_SHIFT}" \
+    --adapter-family "${ADAPTER_FAMILY}" \
+    --conv-hidden-channels "${CONV_HIDDEN_CHANNELS}" \
+    --conv-layers "${CONV_LAYERS}" \
+    --conv-residual-scale "${CONV_RESIDUAL_SCALE}" \
     --data-path "${DATA_PATH}" \
     --output-dir "${OUTPUT_DIR}" \
     --eval-json "${EVAL_JSON}" \
@@ -97,7 +107,8 @@ python scripts/train_input_film_adapter.py \
     --variance-weight "${VARIANCE_WEIGHT}" \
     --covariance-weight "${COVARIANCE_WEIGHT}" \
     --identity-weight "${IDENTITY_WEIGHT}" \
-    --image-pair-weight "${IMAGE_PAIR_WEIGHT}"
+    --image-pair-weight "${IMAGE_PAIR_WEIGHT}" \
+    "$([ "${CONV_ZERO_INIT}" = "true" ] && echo --conv-zero-init || echo --no-conv-zero-init)"
 
 echo ""
 echo "Wrote ${EVAL_JSON}"

@@ -60,6 +60,7 @@ class InputChannelAffine(nn.Module):
     def stats(self):
         matrix = self.matrix().detach()
         return {
+            "adapter_family": "affine",
             "input_matrix": matrix.cpu().tolist(),
             "input_bias": self.bias.detach().cpu().tolist(),
             "input_matrix_delta_l2": self.matrix_delta.detach().norm().item(),
@@ -69,12 +70,107 @@ class InputChannelAffine(nn.Module):
             ),
         }
 
+    def regularization_loss(
+        self,
+        _target_states: torch.Tensor,
+        _adapted_states: torch.Tensor,
+    ) -> torch.Tensor:
+        eye = torch.eye(
+            self.channels,
+            device=self.matrix_delta.device,
+            dtype=self.matrix_delta.dtype,
+        )
+        return F.mse_loss(self.matrix(), eye) + self.bias.pow(2).mean()
+
+
+class InputResidualConv(nn.Module):
+    """Small residual image adapter before the frozen encoder.
+
+    This is the next-capacity control above the 2x2 affine adapter. It can make
+    local spatial corrections, but it still leaves the JEPA encoder/predictor
+    completely frozen.
+    """
+
+    def __init__(
+        self,
+        channels: int = 2,
+        hidden_channels: int = 16,
+        n_layers: int = 3,
+        residual_scale: float = 1.0,
+        zero_init: bool = True,
+    ):
+        super().__init__()
+        if n_layers < 2:
+            raise ValueError("InputResidualConv requires n_layers >= 2")
+
+        self.channels = channels
+        self.hidden_channels = hidden_channels
+        self.n_layers = n_layers
+        self.residual_scale = residual_scale
+
+        layers = [
+            nn.Conv2d(channels, hidden_channels, kernel_size=3, padding=1),
+            nn.GELU(),
+        ]
+        for _ in range(n_layers - 2):
+            layers.extend(
+                [
+                    nn.Conv2d(
+                        hidden_channels,
+                        hidden_channels,
+                        kernel_size=3,
+                        padding=1,
+                    ),
+                    nn.GELU(),
+                ]
+            )
+        final = nn.Conv2d(hidden_channels, channels, kernel_size=3, padding=1)
+        if zero_init:
+            nn.init.zeros_(final.weight)
+            nn.init.zeros_(final.bias)
+        layers.append(final)
+        self.net = nn.Sequential(*layers)
+        self.final_conv = final
+
+    def forward(self, states: torch.Tensor) -> torch.Tensor:
+        original_shape = states.shape
+        images = states.reshape(-1, *original_shape[-3:])
+        residual = self.net(images).reshape(original_shape)
+        return states + self.residual_scale * residual
+
+    @torch.no_grad()
+    def stats(self):
+        total_sq = sum(
+            parameter.detach().pow(2).sum()
+            for parameter in self.parameters()
+            if parameter.requires_grad
+        )
+        return {
+            "adapter_family": "residual_conv",
+            "conv_hidden_channels": self.hidden_channels,
+            "conv_layers": self.n_layers,
+            "conv_residual_scale": self.residual_scale,
+            "conv_final_weight_l2": self.final_conv.weight.detach().norm().item(),
+            "conv_final_bias_l2": self.final_conv.bias.detach().norm().item(),
+            "conv_parameter_l2": total_sq.sqrt().item(),
+            "adapter_trainable_parameters": sum(
+                p.numel() for p in self.parameters() if p.requires_grad
+            ),
+        }
+
+    def regularization_loss(
+        self,
+        target_states: torch.Tensor,
+        adapted_states: torch.Tensor,
+    ) -> torch.Tensor:
+        return F.mse_loss(adapted_states, target_states)
+
 
 def parse_args():
     parser = argparse.ArgumentParser(
         description=(
-            "Train a tiny input FiLM/channel-affine adapter before the frozen "
-            "JEPA encoder with anti-collapse source-trajectory losses."
+            "Train a small input adapter before the frozen JEPA encoder with "
+            "anti-collapse source-trajectory losses."
         )
     )
     parser.add_argument("--source-config", default="configs/two_rooms_baseline_jepa.yaml")
@@ -87,6 +183,19 @@ def parse_args():
     )
     parser.add_argument("--data-path", default="outputs/data/two_rooms_len17_3m.npz")
     parser.add_argument("--appearance-shift", default="medium")
+    parser.add_argument(
+        "--adapter-family",
+        choices=["affine", "residual_conv"],
+        default="affine",
+    )
+    parser.add_argument("--conv-hidden-channels", type=int, default=16)
+    parser.add_argument("--conv-layers", type=int, default=3)
+    parser.add_argument("--conv-residual-scale", type=float, default=1.0)
+    parser.add_argument(
+        "--conv-zero-init",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
     parser.add_argument(
         "--output-dir",
         default="outputs/adaptation/input_film/two_rooms_medium_input_affine_3ep",
@@ -120,6 +229,20 @@ def parse_args():
     parser.add_argument("--gradient-clip-norm", type=float, default=1.0)
     parser.add_argument("--seed", type=int, default=123)
     return parser.parse_args()
+
+
+def build_input_adapter(args, channels):
+    if args.adapter_family == "affine":
+        return InputChannelAffine(channels=channels)
+    if args.adapter_family == "residual_conv":
+        return InputResidualConv(
+            channels=channels,
+            hidden_channels=args.conv_hidden_channels,
+            n_layers=args.conv_layers,
+            residual_scale=args.conv_residual_scale,
+            zero_init=args.conv_zero_init,
+        )
+    raise ValueError(f"Unknown adapter family: {args.adapter_family}")
 
 
 def encode_states_grad(model, states: torch.Tensor) -> torch.Tensor:
@@ -195,15 +318,6 @@ def rollout_losses(model, adapted_z, source_z, actions, horizon, discount=1.0):
     return (source_by_h * weights_t).sum(), (self_by_h * weights_t).sum()
 
 
-def identity_loss(adapter):
-    eye = torch.eye(
-        adapter.channels,
-        device=adapter.matrix_delta.device,
-        dtype=adapter.matrix_delta.dtype,
-    )
-    return F.mse_loss(adapter.matrix(), eye) + adapter.bias.pow(2).mean()
-
-
 def compute_losses(model, input_adapter, batch, normalizer, shift, args, device):
     source_states, actions, _locations = batch_to_device_time_major(batch, device)
     target_states = shift_states_on_device(source_states, normalizer, shift)
@@ -229,7 +343,7 @@ def compute_losses(model, input_adapter, batch, normalizer, shift, args, device)
         horizon=args.horizon,
     )
     variance, covariance = distribution_losses(adapted_z, source_z)
-    identity = identity_loss(input_adapter)
+    identity = input_adapter.regularization_loss(target_states[:t], adapted_states[:t])
 
     if args.image_pair_weight:
         source_images = source_states[:t]
@@ -455,6 +569,7 @@ def evaluate(model, input_adapter, train_loader, val_loader, args, device):
     adapted_probe = train_probe(adapted_train_z, adapted_train_loc, args.probe_steps)
     report = {
         "appearance_shift": args.appearance_shift,
+        "adapter_family": args.adapter_family,
         "source_probe_on_source": eval_probe(
             source_probe,
             source_val_z,
@@ -539,7 +654,7 @@ def main():
     model.eval()
     model.level1.predictor.train()
 
-    input_adapter = InputChannelAffine(channels=channels).to(device)
+    input_adapter = build_input_adapter(args, channels).to(device)
     optimizer = torch.optim.AdamW(
         input_adapter.parameters(),
         lr=args.lr,
@@ -553,6 +668,7 @@ def main():
             {
                 "event": "input_film_train_start",
                 "channels": channels,
+                "adapter_family": args.adapter_family,
                 "train_batches": len(train_loader),
                 "max_train_batches_per_epoch": args.max_train_batches_per_epoch,
                 **input_adapter.stats(),
@@ -646,6 +762,7 @@ def main():
 
     flat = {
         "appearance_shift": eval_report["appearance_shift"],
+        "adapter_family": eval_report["adapter_family"],
         "source_probe_source_rmse": eval_report["source_probe_on_source"][
             "rmse_pixels"
         ],
@@ -677,8 +794,11 @@ def main():
         "source_total_variance": eval_report["source_latent_stats"][
             "latent_total_variance"
         ],
-        "input_matrix": json.dumps(eval_report["input_matrix"]),
-        "input_bias": json.dumps(eval_report["input_bias"]),
+        "input_matrix": json.dumps(eval_report.get("input_matrix")),
+        "input_bias": json.dumps(eval_report.get("input_bias")),
+        "conv_hidden_channels": eval_report.get("conv_hidden_channels"),
+        "conv_layers": eval_report.get("conv_layers"),
+        "conv_parameter_l2": eval_report.get("conv_parameter_l2"),
     }
     with output_csv.open("w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=list(flat.keys()))
