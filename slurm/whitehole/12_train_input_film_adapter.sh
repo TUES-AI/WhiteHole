@@ -26,9 +26,11 @@ module load nvidia/cuda/12
 PROJECT_DIR="/valhalla/projects/${SLURM_JOB_ACCOUNT}/WhiteHole"
 VIRTUAL_ENV="/valhalla/projects/${SLURM_JOB_ACCOUNT}/conda_envs/torch"
 
-OUTPUT_DIR="${OUTPUT_DIR:-outputs/adaptation/input_film/two_rooms_medium_input_affine_3ep}"
-EVAL_JSON="${EVAL_JSON:-outputs/eval/input_film/two_rooms_medium_input_affine_3ep_eval.json}"
-EVAL_CSV="${EVAL_CSV:-outputs/eval/input_film/two_rooms_medium_input_affine_3ep_eval.csv}"
+APPEARANCE_SHIFT="${APPEARANCE_SHIFT:-medium}"
+RUN_NAME="${RUN_NAME:-two_rooms_${APPEARANCE_SHIFT}_input_affine_3ep}"
+OUTPUT_DIR="${OUTPUT_DIR:-outputs/adaptation/input_film/${RUN_NAME}}"
+EVAL_JSON="${EVAL_JSON:-outputs/eval/input_film/${RUN_NAME}_eval.json}"
+EVAL_CSV="${EVAL_CSV:-outputs/eval/input_film/${RUN_NAME}_eval.csv}"
 EPOCHS="${EPOCHS:-3}"
 MAX_TRAIN_BATCHES_PER_EPOCH="${MAX_TRAIN_BATCHES_PER_EPOCH:-1000}"
 LR="${LR:-0.02}"
@@ -70,6 +72,7 @@ PY
 echo ""
 echo "===================================================="
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Input FiLM encoder-adaptation control"
+echo "  appearance_shift=${APPEARANCE_SHIFT}"
 echo "  output_dir=${OUTPUT_DIR}"
 echo "  eval_json=${EVAL_JSON}"
 echo "  epochs=${EPOCHS}"
@@ -78,6 +81,7 @@ echo "  lr=${LR}"
 echo "===================================================="
 
 python scripts/train_input_film_adapter.py \
+    --appearance-shift "${APPEARANCE_SHIFT}" \
     --output-dir "${OUTPUT_DIR}" \
     --eval-json "${EVAL_JSON}" \
     --eval-csv "${EVAL_CSV}" \

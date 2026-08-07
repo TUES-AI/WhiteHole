@@ -455,6 +455,7 @@ def evaluate(model, input_adapter, train_loader, val_loader, args, device):
     source_probe = train_probe(source_train_z, source_train_loc, args.probe_steps)
     adapted_probe = train_probe(adapted_train_z, adapted_train_loc, args.probe_steps)
     report = {
+        "appearance_shift": args.appearance_shift,
         "source_probe_on_source": eval_probe(
             source_probe,
             source_val_z,
@@ -633,6 +634,7 @@ def main():
     output_json.write_text(json.dumps(jsonable(eval_report), indent=2) + "\n")
 
     flat = {
+        "appearance_shift": eval_report["appearance_shift"],
         "source_probe_source_rmse": eval_report["source_probe_on_source"][
             "rmse_pixels"
         ],
