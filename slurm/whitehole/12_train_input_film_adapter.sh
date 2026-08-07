@@ -28,6 +28,7 @@ VIRTUAL_ENV="/valhalla/projects/${SLURM_JOB_ACCOUNT}/conda_envs/torch"
 
 APPEARANCE_SHIFT="${APPEARANCE_SHIFT:-medium}"
 RUN_NAME="${RUN_NAME:-two_rooms_${APPEARANCE_SHIFT}_input_affine_3ep}"
+DATA_PATH="${DATA_PATH:-outputs/data/two_rooms_len17_3m.npz}"
 OUTPUT_DIR="${OUTPUT_DIR:-outputs/adaptation/input_film/${RUN_NAME}}"
 EVAL_JSON="${EVAL_JSON:-outputs/eval/input_film/${RUN_NAME}_eval.json}"
 EVAL_CSV="${EVAL_CSV:-outputs/eval/input_film/${RUN_NAME}_eval.csv}"
@@ -73,6 +74,7 @@ echo ""
 echo "===================================================="
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Input FiLM encoder-adaptation control"
 echo "  appearance_shift=${APPEARANCE_SHIFT}"
+echo "  data_path=${DATA_PATH}"
 echo "  output_dir=${OUTPUT_DIR}"
 echo "  eval_json=${EVAL_JSON}"
 echo "  epochs=${EPOCHS}"
@@ -82,6 +84,7 @@ echo "===================================================="
 
 python scripts/train_input_film_adapter.py \
     --appearance-shift "${APPEARANCE_SHIFT}" \
+    --data-path "${DATA_PATH}" \
     --output-dir "${OUTPUT_DIR}" \
     --eval-json "${EVAL_JSON}" \
     --eval-csv "${EVAL_CSV}" \
