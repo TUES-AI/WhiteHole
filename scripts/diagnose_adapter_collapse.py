@@ -380,8 +380,13 @@ def main():
     output_csv.parent.mkdir(parents=True, exist_ok=True)
     output_json.write_text(json.dumps(jsonable(report), indent=2) + "\n")
 
+    fieldnames = sorted({key for row in rows for key in row})
+    if "name" in fieldnames:
+        fieldnames.remove("name")
+        fieldnames = ["name", *fieldnames]
+
     with output_csv.open("w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(rows)
 
