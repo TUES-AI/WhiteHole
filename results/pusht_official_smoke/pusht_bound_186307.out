@@ -1,0 +1,27 @@
+[2026-08-07 20:08:38,801][__main__][INFO] - Planning result saved dir: /valhalla/projects/bg-eng-01/dino_wm/plan_outputs/pusht_official_bound_
+Loaded 18685 rollouts
+Loaded 21 rollouts
+Resuming from epoch 2: /valhalla/projects/bg-eng-01/dino_wm/official_artifacts/extracted/outputs/pusht/checkpoints/model_latest.pth
+[2026-08-07 20:08:45,952][dinov2][INFO] - using MLP layer as FFN
+num_action_repeat: 1
+num_proprio_repeat: 1
+proprio encoder: ProprioceptiveEmbedding(
+  (patch_embed): Conv1d(4, 10, kernel_size=(1,), stride=(1,))
+)
+action encoder: ProprioceptiveEmbedding(
+  (patch_embed): Conv1d(10, 10, kernel_size=(1,), stride=(1,))
+)
+proprio_dim: 10, after repeat: 10
+action_dim: 10, after repeat: 10
+emb_dim: 404
+Model emb_dim:  404
+eval_seed:  [1]
+Dumped plan targets to /valhalla/projects/bg-eng-01/dino_wm/plan_outputs/pusht_official_bound_/plan_targets.pkl
+Success rate:  0.0
+{'success': array([False]), 'state_dist': array([226.30105942])}
+MPC iter 0 Eval ------- 
+Success rate:  0.0
+{'success': array([False]), 'state_dist': array([226.30105942])}
+self.is_success:  [False]
+Success rate:  0.0
+{'success': array([False]), 'state_dist': array([226.30105942])}
