@@ -1,10 +1,10 @@
 # shellcheck shell=bash
-# Chain PLDM epoch-checkpoint jobs across a 4h Slurm wall-time cap.
+# Chain WhiteHole epoch-checkpoint jobs across a 4h Slurm wall-time cap.
 #
 # Required caller variables:
 #   OUTPUT_ROOT   root checkpoint directory
 #   OUTPUT_DIR    run-specific checkpoint directory under OUTPUT_ROOT
-#   EPOCHS        target epoch value passed to pldm.train
+#   EPOCHS        target epoch value passed to whitehole.train
 #   SELF_SCRIPT   repo-relative Slurm script path to resubmit
 #
 # Optional:
@@ -40,7 +40,7 @@ if [ "${_ac_latest_epoch}" -ge "${EPOCHS}" ]; then
 fi
 
 if [ "${_ac_latest_epoch}" -ge 0 ]; then
-    echo "[autochain] latest checkpoint epoch ${_ac_latest_epoch}; pldm.train will resume from ${_ac_ckpt_dir}."
+    echo "[autochain] latest checkpoint epoch ${_ac_latest_epoch}; whitehole.train will resume from ${_ac_ckpt_dir}."
 else
     echo "[autochain] no checkpoint found in ${_ac_ckpt_dir}; starting fresh."
 fi

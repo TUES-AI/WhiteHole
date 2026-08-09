@@ -1,3 +1,5 @@
+.env
+.DS_Store
 bash_*
 *.sbatch
 logs/
@@ -17,10 +19,10 @@ dist/
 *.egg-info/
 
 # Large generated/downloaded environment datasets.
-pldm_envs/**/presaved_datasets/**/*.npz
-pldm_envs/**/presaved_datasets/**/*.npy
-pldm_envs/**/presaved_datasets/**/*.tar.gz
-pldm_envs/**/presaved_datasets/**/data.p
+whitehole_envs/**/presaved_datasets/**/*.npz
+whitehole_envs/**/presaved_datasets/**/*.npy
+whitehole_envs/**/presaved_datasets/**/*.tar.gz
+whitehole_envs/**/presaved_datasets/**/data.p
 
-# Upstream local debug renders; regenerate with pldm_envs/wall/test.py if needed.
-pldm_envs/wall/debug_output/
+# Local debug renders; regenerate with whitehole_envs/wall/test.py if needed.
+whitehole_envs/wall/debug_output/

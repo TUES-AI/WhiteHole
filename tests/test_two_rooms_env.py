@@ -2,15 +2,15 @@ import unittest
 
 import torch
 
-from pldm_envs.wall.wall import DotWall
-from pldm_envs.wall.data.wall import WallDataset, WallDatasetConfig
+from whitehole_envs.wall.wall import DotWall
+from whitehole_envs.wall.data.wall import WallDataset, WallDatasetConfig
 
 
 class DotWallTest(unittest.TestCase):
     def make_env(self):
         return DotWall(device=torch.device("cpu"))
 
-    def test_reset_returns_paper_observation_shape(self):
+    def test_reset_returns_expected_observation_shape(self):
         env = self.make_env()
         obs, info = env.reset(seed=123)
 
@@ -85,7 +85,7 @@ class DotWallTest(unittest.TestCase):
         self.assertEqual(reward, 1.0)
         self.assertIs(done, True)
 
-    def test_dataset_generator_uses_paper_observation_shape_by_default(self):
+    def test_dataset_generator_uses_expected_observation_shape_by_default(self):
         dataset = WallDataset(
             WallDatasetConfig(batch_size=2, n_steps=4, size=2, device="cpu")
         )

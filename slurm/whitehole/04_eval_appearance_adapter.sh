@@ -26,7 +26,7 @@ module load nvidia/cuda/12
 PROJECT_DIR="/valhalla/projects/${SLURM_JOB_ACCOUNT}/WhiteHole"
 VIRTUAL_ENV="/valhalla/projects/${SLURM_JOB_ACCOUNT}/conda_envs/torch"
 CONFIG="${CONFIG:-configs/adaptation/two_rooms_medium_delta_proposal.yaml}"
-CHECKPOINT="${CHECKPOINT:-outputs/pldm/two_rooms_jepa_baseline_len17_3m/epoch=10_sample_step=2072576.ckpt}"
+CHECKPOINT="${CHECKPOINT:-outputs/whitehole/two_rooms_jepa_baseline_len17_3m/epoch=10_sample_step=2072576.ckpt}"
 ADAPTER_CHECKPOINT="${ADAPTER_CHECKPOINT:-outputs/adaptation/two_rooms_medium_delta_proposal_3ep/adapter_latest.ckpt}"
 DATA_PATH="${DATA_PATH:-outputs/data/two_rooms_len17_3m.npz}"
 APPEARANCE_SHIFT="${APPEARANCE_SHIFT:-medium}"
@@ -129,7 +129,7 @@ echo "  appearance_shift=${APPEARANCE_SHIFT}"
 echo "===================================================="
 echo ""
 
-python -m pldm.adaptation.eval \
+python -m whitehole.adaptation.eval \
     --configs "${CONFIG}" \
     --values \
         source_checkpoint_path="${CHECKPOINT}" \

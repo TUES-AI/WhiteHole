@@ -11,11 +11,11 @@ eval_every_n_epochs: 10
 eval_mpcs: 20
 eval_only: false
 output_dir: two_rooms_jepa_baseline_len17_3m
-output_root: outputs/pldm
+output_root: outputs/whitehole
 quick_debug: false
 resume_if_possible: true
 run_name: two_rooms_jepa_baseline_len17_3m
-run_project: PLDM-local
+run_project: WhiteHole-local
 save_every_n_epochs: 1
 seed: 101
 train_only: true

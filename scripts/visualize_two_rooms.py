@@ -10,8 +10,8 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from pldm_envs.wall.appearance import APPEARANCE_SHIFTS, apply_appearance_shift
-from pldm_envs.wall.wall import DotWall
+from whitehole_envs.wall.appearance import APPEARANCE_SHIFTS, apply_appearance_shift
+from whitehole_envs.wall.wall import DotWall
 
 
 def compose_frame(obs, target_obs, target_overlay_obs=None):
@@ -65,7 +65,7 @@ def action_toward(env, waypoint):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Visualize the PLDM Two-Rooms env.")
+    parser = argparse.ArgumentParser(description="Visualize the WhiteHole Two-Rooms env.")
     parser.add_argument("--output-dir", default="outputs/two_rooms")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--steps", type=int, default=120)

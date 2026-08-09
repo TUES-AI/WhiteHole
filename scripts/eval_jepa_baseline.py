@@ -6,13 +6,13 @@ from pathlib import Path
 import torch
 from tqdm.auto import tqdm
 
-from pldm.configs import omegaconf_parse_files_vals
-from pldm.data.dataset_factory import DatasetFactory
-from pldm.data.utils import make_dataloader_for_prebatched_ds
-from pldm.models.hjepa import HJEPA
-from pldm.train import TrainConfig
-from pldm_envs.wall.appearance import APPEARANCE_SHIFTS, apply_appearance_shift
-from pldm_envs.wall.data.wall import WallDataset
+from whitehole.configs import omegaconf_parse_files_vals
+from whitehole.data.dataset_factory import DatasetFactory
+from whitehole.data.utils import make_dataloader_for_prebatched_ds
+from whitehole.models.hjepa import HJEPA
+from whitehole.train import TrainConfig
+from whitehole_envs.wall.appearance import APPEARANCE_SHIFTS, apply_appearance_shift
+from whitehole_envs.wall.data.wall import WallDataset
 
 
 def parse_args():
@@ -23,7 +23,7 @@ def parse_args():
     parser.add_argument(
         "--checkpoint",
         default=(
-            "outputs/pldm/two_rooms_jepa_baseline_len17_3m/"
+            "outputs/whitehole/two_rooms_jepa_baseline_len17_3m/"
             "epoch=10_sample_step=2072576.ckpt"
         ),
     )

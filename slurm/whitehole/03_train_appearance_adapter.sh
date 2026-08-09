@@ -32,7 +32,7 @@ module load nvidia/cuda/12
 PROJECT_DIR="/valhalla/projects/${SLURM_JOB_ACCOUNT}/WhiteHole"
 VIRTUAL_ENV="/valhalla/projects/${SLURM_JOB_ACCOUNT}/conda_envs/torch"
 CONFIG="${CONFIG:-configs/adaptation/two_rooms_medium_delta_proposal.yaml}"
-CHECKPOINT="${CHECKPOINT:-outputs/pldm/two_rooms_jepa_baseline_len17_3m/epoch=10_sample_step=2072576.ckpt}"
+CHECKPOINT="${CHECKPOINT:-outputs/whitehole/two_rooms_jepa_baseline_len17_3m/epoch=10_sample_step=2072576.ckpt}"
 DATA_PATH="${DATA_PATH:-outputs/data/two_rooms_len17_3m.npz}"
 OUTPUT_DIR="${OUTPUT_DIR:-outputs/adaptation/two_rooms_medium_delta_proposal_3ep}"
 OUTPUT_DIR="${OUTPUT_DIR%/}"
@@ -158,7 +158,7 @@ echo ""
 
 T0=$(date +%s)
 
-python -m pldm.adaptation.train \
+python -m whitehole.adaptation.train \
     --configs "${CONFIG}" \
     --values \
         source_checkpoint_path="${CHECKPOINT}" \

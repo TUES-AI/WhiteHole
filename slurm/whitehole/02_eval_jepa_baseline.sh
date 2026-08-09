@@ -27,7 +27,7 @@ PROJECT_DIR="/valhalla/projects/${SLURM_JOB_ACCOUNT}/WhiteHole"
 VIRTUAL_ENV="/valhalla/projects/${SLURM_JOB_ACCOUNT}/conda_envs/torch"
 
 CONFIG="${CONFIG:-configs/two_rooms_baseline_jepa.yaml}"
-CHECKPOINT="${CHECKPOINT:-outputs/pldm/two_rooms_jepa_baseline_len17_3m/epoch=10_sample_step=2072576.ckpt}"
+CHECKPOINT="${CHECKPOINT:-outputs/whitehole/two_rooms_jepa_baseline_len17_3m/epoch=10_sample_step=2072576.ckpt}"
 EVAL_APPEARANCE_SHIFT="${EVAL_APPEARANCE_SHIFT:-source}"
 OUTPUT_JSON="${OUTPUT_JSON:-outputs/eval/two_rooms_jepa_baseline_${EVAL_APPEARANCE_SHIFT}_eval.json}"
 

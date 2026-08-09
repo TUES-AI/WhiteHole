@@ -11,7 +11,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from pldm.adaptation.adapters import (
+from whitehole.adaptation.adapters import (
     AdapterEvalConfig,
     AppearanceAdapter,
     AppearanceAdapterConfig,
@@ -30,7 +30,7 @@ from pldm.adaptation.adapters import (
     set_source_model_for_adapter_train,
     take_batches,
 )
-from pldm.configs import omegaconf_parse_files_vals
+from whitehole.configs import omegaconf_parse_files_vals
 
 
 def parse_args():
@@ -47,7 +47,7 @@ def parse_args():
     parser.add_argument(
         "--source-checkpoint",
         default=(
-            "outputs/pldm/two_rooms_jepa_baseline_len17_3m/"
+            "outputs/whitehole/two_rooms_jepa_baseline_len17_3m/"
             "epoch=10_sample_step=2072576.ckpt"
         ),
     )

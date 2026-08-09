@@ -29,7 +29,7 @@ VIRTUAL_ENV="/valhalla/projects/${SLURM_JOB_ACCOUNT}/conda_envs/torch"
 CONFIG="${CONFIG:-configs/two_rooms_baseline_jepa.yaml}"
 DELTA_CONFIG="${DELTA_CONFIG:-configs/adaptation/two_rooms_medium_adapter.yaml}"
 DIAGONAL_CONFIG="${DIAGONAL_CONFIG:-configs/adaptation/two_rooms_medium_diagonal_affine.yaml}"
-CHECKPOINT="${CHECKPOINT:-outputs/pldm/two_rooms_jepa_baseline_len17_3m/epoch=10_sample_step=2072576.ckpt}"
+CHECKPOINT="${CHECKPOINT:-outputs/whitehole/two_rooms_jepa_baseline_len17_3m/epoch=10_sample_step=2072576.ckpt}"
 DATA_PATH="${DATA_PATH:-outputs/data/two_rooms_len17_3m.npz}"
 DELTA_ADAPTER_CHECKPOINT="${DELTA_ADAPTER_CHECKPOINT:-outputs/adaptation/delta_anchor_init64/two_rooms_medium_delta_pairw_1d0_3ep/adapter_latest.ckpt}"
 DIAGONAL_ADAPTER_CHECKPOINT="${DIAGONAL_ADAPTER_CHECKPOINT:-outputs/adaptation/diagonal_affine_init64/two_rooms_medium_diagaff_pairw_0d3_3ep/adapter_latest.ckpt}"
@@ -167,7 +167,7 @@ python scripts/eval_jepa_baseline.py \
 
 echo ""
 echo "[3/5] Medium-shift delta adapter eval"
-python -m pldm.adaptation.eval \
+python -m whitehole.adaptation.eval \
     --configs "${DELTA_CONFIG}" \
     --values \
         source_checkpoint_path="${CHECKPOINT}" \
@@ -184,7 +184,7 @@ python -m pldm.adaptation.eval \
 
 echo ""
 echo "[4/5] Medium-shift diagonal-affine adapter eval"
-python -m pldm.adaptation.eval \
+python -m whitehole.adaptation.eval \
     --configs "${DIAGONAL_CONFIG}" \
     --values \
         source_checkpoint_path="${CHECKPOINT}" \

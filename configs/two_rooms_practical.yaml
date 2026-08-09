@@ -11,11 +11,11 @@ eval_every_n_epochs: 5
 eval_mpcs: 20
 eval_only: false
 output_dir: two_rooms_practical
-output_root: outputs/pldm
+output_root: outputs/whitehole
 quick_debug: false
 resume_if_possible: false
 run_name: two_rooms_practical
-run_project: PLDM-local
+run_project: WhiteHole-local
 save_every_n_epochs: 5
 seed: 101
 train_only: false

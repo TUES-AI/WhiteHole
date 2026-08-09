@@ -10,7 +10,7 @@
 set -euo pipefail
 
 CONFIG="${CONFIG:-configs/adaptation/two_rooms_medium_delta_proposal.yaml}"
-CHECKPOINT="${CHECKPOINT:-outputs/pldm/two_rooms_jepa_baseline_len17_3m/epoch=10_sample_step=2072576.ckpt}"
+CHECKPOINT="${CHECKPOINT:-outputs/whitehole/two_rooms_jepa_baseline_len17_3m/epoch=10_sample_step=2072576.ckpt}"
 DATA_PATH="${DATA_PATH:-outputs/data/two_rooms_len17_3m.npz}"
 APPEARANCE_SHIFT="${APPEARANCE_SHIFT:-medium}"
 PAIR_ALIGNMENT_WEIGHTS="${PAIR_ALIGNMENT_WEIGHTS:-0.01 0.03 0.1 0.3}"

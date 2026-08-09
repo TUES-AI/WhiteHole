@@ -11,11 +11,11 @@ eval_every_n_epochs: 1
 eval_mpcs: 2
 eval_only: false
 output_dir: two_rooms_smoke
-output_root: outputs/pldm
+output_root: outputs/whitehole
 quick_debug: true
 resume_if_possible: false
 run_name: two_rooms_smoke
-run_project: PLDM-local
+run_project: WhiteHole-local
 save_every_n_epochs: 1
 seed: 101
 wandb: false

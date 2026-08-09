@@ -1,5 +1,5 @@
 source_config_path: configs/two_rooms_baseline_jepa.yaml
-source_checkpoint_path: outputs/pldm/two_rooms_jepa_baseline_len17_3m/epoch=10_sample_step=2072576.ckpt
+source_checkpoint_path: outputs/whitehole/two_rooms_jepa_baseline_len17_3m/epoch=10_sample_step=2072576.ckpt
 output_dir: outputs/adaptation/two_rooms_medium_lowrank_pairw_1d0_3ep
 adapter_checkpoint_path: outputs/adaptation/two_rooms_medium_lowrank_pairw_1d0_3ep/adapter_latest.ckpt
 output_json: outputs/eval/two_rooms_medium_lowrank_pairw_1d0_3ep_adapter_eval.json

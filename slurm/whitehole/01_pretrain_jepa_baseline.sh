@@ -41,7 +41,7 @@ TRAIN_CONFIG="${TRAIN_CONFIG:-configs/two_rooms_baseline_jepa.yaml}"
 DATA_PATH="${DATA_PATH:-outputs/data/two_rooms_len17_3m.npz}"
 NUM_TRANSITIONS="${NUM_TRANSITIONS:-3000000}"
 EPOCHS="${EPOCHS:-10}"
-OUTPUT_ROOT="${OUTPUT_ROOT:-outputs/pldm}"
+OUTPUT_ROOT="${OUTPUT_ROOT:-outputs/whitehole}"
 OUTPUT_DIR="${OUTPUT_DIR:-two_rooms_jepa_baseline_len17_3m}"
 # OfflineWallDataset moves samples to CUDA in __getitem__, so multiprocessing
 # workers hit "Cannot re-initialize CUDA in forked subprocess". Keep this at 0
@@ -135,7 +135,7 @@ import torch
 print("PyTorch:", torch.__version__)
 print("CUDA available:", torch.cuda.is_available(), "| devices:", torch.cuda.device_count())
 if not torch.cuda.is_available():
-    raise SystemExit("CUDA is required because pldm/train.py currently uses .cuda() directly.")
+    raise SystemExit("CUDA is required because whitehole/train.py currently uses .cuda() directly.")
 for i in range(torch.cuda.device_count()):
     props = torch.cuda.get_device_properties(i)
     print(f"  cuda:{i} = {props.name} | mem={props.total_memory/1e9:.1f} GB")
@@ -143,7 +143,7 @@ PY
 
 if [ ! -f "${DATA_PATH}" ]; then
     echo "Dataset not found; generating ${NUM_TRANSITIONS} transitions..."
-    python pldm_envs/wall/generate_data.py \
+    python whitehole_envs/wall/generate_data.py \
         --config_path "${DATA_CONFIG}" \
         --num_transitions "${NUM_TRANSITIONS}" \
         --output_path "${DATA_PATH}"
@@ -155,7 +155,7 @@ source slurm/whitehole/_autochain_epochs.sh
 
 T0=$(date +%s)
 
-python -m pldm.train \
+python -m whitehole.train \
     --configs "${TRAIN_CONFIG}" \
     --values \
         epochs="${EPOCHS}" \

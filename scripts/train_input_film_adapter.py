@@ -13,7 +13,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from pldm.adaptation.adapters import (
+from whitehole.adaptation.adapters import (
     AdapterDataConfig,
     build_dataloaders,
     build_source_model,
@@ -23,7 +23,7 @@ from pldm.adaptation.adapters import (
     seed_everything,
     take_batches,
 )
-from pldm_envs.wall.appearance import apply_appearance_shift
+from whitehole_envs.wall.appearance import apply_appearance_shift
 
 
 class InputChannelAffine(nn.Module):
@@ -177,7 +177,7 @@ def parse_args():
     parser.add_argument(
         "--source-checkpoint",
         default=(
-            "outputs/pldm/two_rooms_jepa_baseline_len17_3m/"
+            "outputs/whitehole/two_rooms_jepa_baseline_len17_3m/"
             "epoch=10_sample_step=2072576.ckpt"
         ),
     )

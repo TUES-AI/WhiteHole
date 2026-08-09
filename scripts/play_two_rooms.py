@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from pldm_envs.wall.wall import DotWall
+from whitehole_envs.wall.wall import DotWall
 from scripts.visualize_two_rooms import (
     action_toward,
     compose_frame,
@@ -48,7 +48,7 @@ class TwoRoomsViewer:
         self.waypoints = make_heuristic_waypoints(self.env)
 
         self.root = tk.Tk()
-        self.root.title("PLDM Two-Rooms")
+        self.root.title("WhiteHole Two-Rooms")
         self.root.resizable(False, False)
 
         side = self.env.img_size * self.scale
@@ -158,7 +158,7 @@ class TwoRoomsViewer:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Real-time PLDM Two-Rooms viewer.")
+    parser = argparse.ArgumentParser(description="Real-time WhiteHole Two-Rooms viewer.")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--scale", type=int, default=10)
     parser.add_argument("--fps", type=int, default=30)
