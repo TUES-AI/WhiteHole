@@ -64,7 +64,10 @@ Easy invertible appearance shifts are calibration checks; they are not evidence 
 - [AdaJEPA](docs/paper_summaries/summary_2606.32026_adajepa/summary.md) provides an online fine-tuning comparison across encoder, predictor, and LoRA placements.
 
 ## Near-term work
-Establish frozen I-JEPA paired-transformation baselines before expanding the architecture and objective matrix.
-Then run matched Reacher placement and loss comparisons under fixed and moving cameras.
+A matched offline MoVie-style Reacher ablation now separates visual adaptation scope from preservation objectives while freezing LeWM dynamics and control. On 100 identical starts, unadapted LeWM scores 85% on source and 35% on hard camera. Full STN+encoder+projector adaptation scores 78%/75%; STN-only scores 77%/82%; STN+encoder with a frozen projector scores 80%/73%; adding source identity to the full update scores 83%/70%; and adding source-relative latent, predicted-transition, and joint SWD preservation scores 80%/78%.
+The current best hard-camera point estimate is therefore the 83,372-parameter STN-only adapter. Updating the encoder reduced hard-camera success by 9 points relative to STN-only on paired starts (95% bootstrap CI -17 to -1; exact McNemar `p=0.049`) despite improving held-out one-step dynamics MSE. Distribution preservation recovered most of that downstream loss and gave a balanced 80%/78% source/hard result, but did not statistically separate from STN-only at 100 cases. Direct source identity preserved source behavior best but traded away target success.
+These are promising controlled results, not yet a faithful online MoVie reproduction: training uses a fixed target-transition buffer before evaluation rather than interactions inside the control loop. All adapted rows also use one training seed and one regularization setting.
+Next repeat the STN-only, full-update, and SWD rows over multiple training seeds; sweep SWD strength around the current `0.05/0.1/0.1` setting; isolate RGB-input versus patch-grid STN placement; and then separate adaptation interactions from final evaluation.
+Retain the medium-shift full-encoder result as a historical comparison rather than a MoVie result.
 Use PLDM environments only where they isolate a scientific question more cleanly than the main tracks.
 Do not claim general adaptation, architectural novelty, or a final method until repeated downstream evidence supports it.

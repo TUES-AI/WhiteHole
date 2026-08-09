@@ -32,6 +32,7 @@ from scripts.visualize_reacher_shifts import (
     set_hard_camera,
 )
 from scripts.reacher_conv_adapter import AdaptedLeWM, SmallConvAdapter
+from scripts.reacher_movie_adapter import build_movie_encoder
 
 
 class ReacherRenderShiftWrapper(gym.Wrapper):
@@ -68,7 +69,7 @@ def parse_args() -> argparse.Namespace:
         description="Evaluate LeWM Reacher on source/medium/hard visual domains."
     )
     parser.add_argument("--variants", nargs="+", default=list(VARIANTS))
-    parser.add_argument("--num-eval", type=int, default=10)
+    parser.add_argument("--num-eval", type=int, default=30)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--dataset-name", default="dmc/reacher_random")
     parser.add_argument("--policy", default="quentinll/lewm-reacher")
@@ -76,7 +77,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--cache-dir", default=None)
     parser.add_argument(
         "--output-json",
-        default="tmp_reacher_visualization/shift_success_rates_10.json",
+        default="tmp_reacher_visualization/shift_success_rates_30.json",
     )
     parser.add_argument("--goal-offset-steps", type=int, default=25)
     parser.add_argument("--eval-budget", type=int, default=50)
@@ -95,6 +96,25 @@ def load_adapter_model(model, checkpoint_path: str | None, device: str):
 
     checkpoint = torch.load(checkpoint_path, map_location=device)
     cfg = checkpoint.get("adapter_config", {})
+    if cfg.get("type") == "encoder":
+        model.encoder.load_state_dict(checkpoint["encoder_state_dict"], strict=True)
+        model = model.to(device).eval()
+        model.requires_grad_(False)
+        return model, checkpoint
+
+    if cfg.get("type") == "movie_stn":
+        model.encoder = build_movie_encoder(model.encoder, cfg).to(device)
+        model.encoder.load_state_dict(checkpoint["sae_state_dict"], strict=True)
+        model.projector.load_state_dict(
+            checkpoint["projector_state_dict"], strict=True
+        )
+        model = model.to(device).eval()
+        model.requires_grad_(False)
+        return model, checkpoint
+
+    if cfg.get("type", "conv") != "conv":
+        raise ValueError(f"Unknown adapter checkpoint type: {cfg.get('type')!r}")
+
     adapter = SmallConvAdapter(
         channels=int(cfg.get("channels", 16)),
         depth=int(cfg.get("depth", 2)),
@@ -149,8 +169,12 @@ def sample_eval_points(dataset, seed: int, num_eval: int, goal_offset_steps: int
     valid_indices = np.nonzero(valid_mask)[0]
 
     rng = np.random.default_rng(seed)
-    sampled = rng.choice(len(valid_indices) - 1, size=num_eval, replace=False)
-    row_indices = np.sort(valid_indices[sampled])
+    if num_eval > len(valid_indices):
+        raise ValueError(
+            f"Requested num_eval={num_eval}, but only {len(valid_indices)} "
+            "valid start states are available."
+        )
+    row_indices = np.sort(rng.choice(valid_indices, size=num_eval, replace=False))
     rows = dataset.get_row_data(row_indices)
     return row_indices, rows[col_name].tolist(), rows["step_idx"].tolist()
 
