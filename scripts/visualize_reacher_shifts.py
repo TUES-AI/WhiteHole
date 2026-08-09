@@ -7,6 +7,7 @@ That keeps dynamics/state fixed and isolates the observation shift:
 - medium_visual: material, lighting, and deterministic color-grade shift.
 - hard_camera: oblique fixed MuJoCo camera perspective.
 - dcs_bear_static/dynamic: DAVIS bear frames in the MuJoCo sky texture.
+- dynamic_camera: per-episode phased camera orbit with changing elevation and zoom.
 """
 
 from __future__ import annotations
@@ -14,6 +15,7 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+from functools import lru_cache
 from pathlib import Path
 
 import cv2
@@ -34,10 +36,16 @@ from scripts.reacher_distracting_control import (
 )
 
 
-VARIANTS = ("source", "medium_visual", "hard_camera", *DCS_VARIANTS)
+VARIANTS = ("source", "medium_visual", "hard_camera", "dynamic_camera", *DCS_VARIANTS)
 HARD_CAMERA_POS = np.array([0.16, -0.16, 0.82], dtype=np.float64)
 HARD_CAMERA_TARGET = np.array([0.0, 0.0, 0.0], dtype=np.float64)
 HARD_CAMERA_FOVY = 42.0
+DYNAMIC_CAMERA_PERIOD = 24.0
+SOURCE_CAMERA_POS = np.array([0.0, 0.0, 0.75], dtype=np.float64)
+SOURCE_CAMERA_QUAT = np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float64)
+SOURCE_CAMERA_FOVY = 45.0
+CANONICAL_PLANE_Z = 0.015
+REACHER_FOREGROUND_GEOMS = ("root", "target", "arm", "hand", "finger")
 
 
 def parse_args() -> argparse.Namespace:
@@ -149,11 +157,204 @@ def set_hard_camera(env: ReacherDMControlWrapper) -> None:
     env.camera_id = camera_id
 
 
+def camera_phase_from_seed(seed: int | np.integer | None) -> float:
+    """Map an episode seed to a deterministic camera phase in [0, 2 pi)."""
+    if seed is None:
+        return 0.0
+    seed_value = int(np.asarray(seed).reshape(-1)[0])
+    return float(2.0 * np.pi * ((seed_value * 0.7548776662466927) % 1.0))
+
+
+def dynamic_camera_parameters(
+    step: float,
+    phase_offset: float = 0.0,
+) -> dict[str, np.ndarray | float]:
+    """Return a smooth, bounded camera pose for one environment step."""
+    phase = phase_offset + 2.0 * np.pi * float(step) / DYNAMIC_CAMERA_PERIOD
+    radius = 0.24 + 0.04 * np.sin(2.0 * phase + 0.3)
+    height = 0.74 + 0.10 * np.sin(3.0 * phase + 0.6)
+    position = np.array(
+        [radius * np.cos(phase), radius * np.sin(phase), height],
+        dtype=np.float64,
+    )
+    target = np.array(
+        [
+            0.018 * np.sin(2.0 * phase),
+            0.018 * np.cos(3.0 * phase),
+            0.0,
+        ],
+        dtype=np.float64,
+    )
+    fovy = 46.0 + 6.0 * np.sin(2.0 * phase + 0.2)
+    return {
+        "position": position,
+        "target": target,
+        "fovy": float(fovy),
+        "phase": float(phase),
+    }
+
+
+def set_dynamic_camera(
+    env: ReacherDMControlWrapper,
+    step: float,
+    phase_offset: float = 0.0,
+) -> None:
+    camera_id = 0
+    physics = env.env.physics
+    params = dynamic_camera_parameters(step, phase_offset)
+    position = np.asarray(params["position"])
+    target = np.asarray(params["target"])
+    physics.model.cam_pos[camera_id] = position
+    physics.model.cam_quat[camera_id] = look_at_quat(position, target)
+    physics.model.cam_fovy[camera_id] = float(params["fovy"])
+    env.camera_id = camera_id
+
+
+def project_world_to_image(
+    points: np.ndarray,
+    camera_position: np.ndarray,
+    camera_quaternion: np.ndarray,
+    fovy: float,
+    image_width: int,
+    image_height: int,
+) -> np.ndarray:
+    """Project world points using MuJoCo's -Z-looking camera convention."""
+    rotation = transformations.quat_to_mat(camera_quaternion)[:3, :3]
+    camera_points = (np.asarray(points) - camera_position) @ rotation
+    depth = -camera_points[:, 2]
+    if np.any(depth <= 0.0):
+        raise ValueError("Cannot project points behind the camera")
+
+    focal_length = 0.5 * image_height / np.tan(np.deg2rad(fovy) / 2.0)
+    return np.column_stack(
+        [
+            image_width / 2.0 + focal_length * camera_points[:, 0] / depth,
+            image_height / 2.0 - focal_length * camera_points[:, 1] / depth,
+        ]
+    )
+
+
+def dynamic_to_source_homography(
+    step: float,
+    phase_offset: float,
+    image_width: int,
+    image_height: int,
+    plane_z: float = CANONICAL_PLANE_Z,
+) -> np.ndarray:
+    """Map a dynamic-camera workspace plane into the source-camera view."""
+    plane_points = np.array(
+        [
+            [-0.35, -0.35, plane_z],
+            [0.35, -0.35, plane_z],
+            [0.35, 0.35, plane_z],
+            [-0.35, 0.35, plane_z],
+        ],
+        dtype=np.float64,
+    )
+    params = dynamic_camera_parameters(step, phase_offset)
+    position = np.asarray(params["position"])
+    dynamic_pixels = project_world_to_image(
+        plane_points,
+        position,
+        look_at_quat(position, np.asarray(params["target"])),
+        float(params["fovy"]),
+        image_width,
+        image_height,
+    )
+    source_pixels = project_world_to_image(
+        plane_points,
+        SOURCE_CAMERA_POS,
+        SOURCE_CAMERA_QUAT,
+        SOURCE_CAMERA_FOVY,
+        image_width,
+        image_height,
+    )
+    return cv2.getPerspectiveTransform(
+        dynamic_pixels.astype(np.float32), source_pixels.astype(np.float32)
+    )
+
+
+def canonicalize_dynamic_frame(
+    frame: np.ndarray,
+    step: float,
+    phase_offset: float,
+    source_background: np.ndarray | None = None,
+) -> np.ndarray:
+    """Rectify a dynamic-camera frame, optionally restoring unseen background."""
+    image_height, image_width = frame.shape[:2]
+    homography = dynamic_to_source_homography(
+        step, phase_offset, image_width, image_height
+    )
+    if source_background is None:
+        return cv2.warpPerspective(
+            frame,
+            homography,
+            (image_width, image_height),
+            flags=cv2.INTER_LINEAR,
+            borderMode=cv2.BORDER_REPLICATE,
+        )
+
+    if source_background.shape != frame.shape:
+        raise ValueError(
+            "source_background and frame must have the same shape; "
+            f"got {source_background.shape} and {frame.shape}"
+        )
+    warped = cv2.warpPerspective(
+        frame,
+        homography,
+        (image_width, image_height),
+        flags=cv2.INTER_LINEAR,
+        borderMode=cv2.BORDER_CONSTANT,
+        borderValue=0,
+    ).astype(np.float32)
+    coverage = cv2.warpPerspective(
+        np.ones((image_height, image_width), dtype=np.float32),
+        homography,
+        (image_width, image_height),
+        flags=cv2.INTER_LINEAR,
+        borderMode=cv2.BORDER_CONSTANT,
+        borderValue=0,
+    )
+    coverage = np.clip(coverage, 0.0, 1.0)
+    completed = warped + source_background.astype(np.float32) * (
+        1.0 - coverage[..., None]
+    )
+    return np.clip(completed, 0.0, 255.0).round().astype(frame.dtype)
+
+
+@lru_cache(maxsize=4)
+def _cached_source_background(image_size: int) -> np.ndarray:
+    env = make_env("source")
+    physics = env.env.physics
+    try:
+        hide_reacher_foreground(physics)
+        physics.forward()
+        background = env.render(width=image_size, height=image_size)
+    finally:
+        env.close()
+    background.setflags(write=False)
+    return background
+
+
+def render_source_background(image_size: int) -> np.ndarray:
+    """Render a source-view workspace with all state-dependent geoms hidden."""
+    return _cached_source_background(image_size).copy()
+
+
+def hide_reacher_foreground(physics) -> None:
+    """Hide all movable Reacher geoms while retaining the static workspace."""
+    for geom_name in REACHER_FOREGROUND_GEOMS:
+        geom_id = physics.model.name2id(geom_name, "geom")
+        physics.model.geom_rgba[geom_id, 3] = 0.0
+
+
 def make_env(
     variant: str,
     background_video: str | Path | None = None,
     background_seed: int = 0,
 ) -> ReacherDMControlWrapper:
+    if variant not in VARIANTS:
+        raise ValueError(f"Unknown variant {variant!r}; choose from {VARIANTS}")
     env = ReacherDMControlWrapper(task="qpos_match", seed=0, render_mode="rgb_array")
     if variant == "medium_visual":
         env.reset(seed=0, options=medium_variation_options())
@@ -161,6 +362,8 @@ def make_env(
         env.reset(seed=0)
     if variant == "hard_camera":
         set_hard_camera(env)
+    elif variant == "dynamic_camera":
+        set_dynamic_camera(env, step=0.0)
     if is_dcs_variant(variant):
         env._dcs_background = DavisBearBackground(
             background_video,
@@ -178,13 +381,41 @@ def render_variant(
     background_seed: int = 0,
     background_episode_ids: np.ndarray | list[int] | None = None,
     background_step_indices: np.ndarray | list[int] | None = None,
+    camera_steps: np.ndarray | list[float] | float | None = None,
+    camera_phase_offsets: np.ndarray | list[float] | float | None = None,
+    render_env: ReacherDMControlWrapper | None = None,
 ) -> list[np.ndarray]:
-    env = make_env(variant, background_video, background_seed)
+    owns_env = render_env is None
+    env = (
+        render_env
+        if render_env is not None
+        else make_env(variant, background_video, background_seed)
+    )
     num_states = len(states["qpos"])
     if background_episode_ids is None:
         background_episode_ids = np.zeros(num_states, dtype=int)
     if background_step_indices is None:
         background_step_indices = np.arange(num_states)
+    if camera_steps is None:
+        camera_steps_array = np.arange(num_states, dtype=np.float64)
+    else:
+        camera_steps_array = np.broadcast_to(
+            np.asarray(camera_steps, dtype=np.float64), (num_states,)
+        )
+
+    if camera_phase_offsets is None:
+        seeds = states.get("seed")
+        if seeds is None:
+            phase_offsets = np.zeros(num_states, dtype=np.float64)
+        else:
+            phase_offsets = np.asarray(
+                [camera_phase_from_seed(seed) for seed in seeds],
+                dtype=np.float64,
+            )
+    else:
+        phase_offsets = np.broadcast_to(
+            np.asarray(camera_phase_offsets, dtype=np.float64), (num_states,)
+        )
 
     frames = []
     for index, (qpos, qvel) in enumerate(zip(states["qpos"], states["qvel"])):
@@ -195,11 +426,18 @@ def render_variant(
                 int(background_step_indices[index]),
             )
             env._dcs_background.apply(env.env.physics)
+        if variant == "dynamic_camera":
+            set_dynamic_camera(
+                env,
+                step=float(camera_steps_array[index]),
+                phase_offset=float(phase_offsets[index]),
+            )
         frame = env.render(width=image_size, height=image_size)
         if variant == "medium_visual":
             frame = color_grade(frame)
         frames.append(frame)
-    env.close()
+    if owns_env:
+        env.close()
     return frames
 
 

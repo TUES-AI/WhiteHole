@@ -51,7 +51,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--cache-dir", default=None)
     parser.add_argument(
         "--target-variant",
-        choices=("medium_visual", "hard_camera", *DCS_VARIANTS),
+        choices=("medium_visual", "hard_camera", "dynamic_camera", *DCS_VARIANTS),
         default="hard_camera",
     )
     parser.add_argument(
@@ -86,11 +86,17 @@ def parse_args() -> argparse.Namespace:
 def render_images(
     rows: dict,
     variant: str,
+    action_block: int,
     background_video: str | None = None,
     background_seed: int = 0,
 ) -> torch.Tensor:
     states = {"qpos": rows["qpos"], "qvel": rows["qvel"]}
+    if "seed" in rows:
+        states["seed"] = rows["seed"]
     episode_key = "episode_idx" if "episode_idx" in rows else "ep_idx"
+    camera_steps = None
+    if variant == "dynamic_camera":
+        camera_steps = np.asarray(rows["step_idx"], dtype=np.float64) / action_block
     frames = np.stack(
         render_variant(
             states,
@@ -100,6 +106,7 @@ def render_images(
             background_seed=background_seed,
             background_episode_ids=rows[episode_key],
             background_step_indices=rows["step_idx"],
+            camera_steps=camera_steps,
         )
     )
     return normalize_images(frames)
@@ -284,17 +291,19 @@ def main() -> None:
     target_start_images = render_images(
         start_data,
         args.target_variant,
+        args.action_block,
         args.background_video,
         args.background_seed,
     )
     target_next_images = render_images(
         next_data,
         args.target_variant,
+        args.action_block,
         args.background_video,
         args.background_seed,
     )
-    source_start_images = render_images(start_data, "source")
-    source_next_images = render_images(next_data, "source")
+    source_start_images = render_images(start_data, "source", args.action_block)
+    source_next_images = render_images(next_data, "source", args.action_block)
 
     scaler = fit_action_scaler(dataset)
     actions = standardize_action_blocks(

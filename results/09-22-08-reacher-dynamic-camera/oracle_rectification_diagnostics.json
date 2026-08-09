@@ -1,0 +1,54 @@
+{
+  "description": "Same physical state across one dynamic-camera orbit; completion background has all movable geoms hidden.",
+  "plane_z": 0.015,
+  "phases": [
+    {
+      "step": 0,
+      "coverage_fraction": 0.9997955560684204,
+      "raw_pixel_mse": 1937.9723705888605,
+      "homography_pixel_mse": 84.07897534013605,
+      "completion_pixel_mse": 83.99378853103741
+    },
+    {
+      "step": 4,
+      "coverage_fraction": 0.9856908321380615,
+      "raw_pixel_mse": 2555.713355654762,
+      "homography_pixel_mse": 1701.9187393707482,
+      "completion_pixel_mse": 1660.6416746386055
+    },
+    {
+      "step": 8,
+      "coverage_fraction": 0.9514802694320679,
+      "raw_pixel_mse": 582.523118622449,
+      "homography_pixel_mse": 624.8757971938776,
+      "completion_pixel_mse": 554.0874986713435
+    },
+    {
+      "step": 12,
+      "coverage_fraction": 0.9468109607696533,
+      "raw_pixel_mse": 1937.9723705888605,
+      "homography_pixel_mse": 1533.2467049319728,
+      "completion_pixel_mse": 1383.3042556866496
+    },
+    {
+      "step": 16,
+      "coverage_fraction": 1.0,
+      "raw_pixel_mse": 2555.713355654762,
+      "homography_pixel_mse": 861.9417184842687,
+      "completion_pixel_mse": 861.9417184842687
+    },
+    {
+      "step": 20,
+      "coverage_fraction": 0.7456884384155273,
+      "raw_pixel_mse": 582.523118622449,
+      "homography_pixel_mse": 1092.971194727891,
+      "completion_pixel_mse": 676.9344108737245
+    }
+  ],
+  "means": {
+    "coverage_fraction": 0.9382443428039551,
+    "raw_pixel_mse": 1692.0696149553569,
+    "homography_pixel_mse": 983.1721883414824,
+    "completion_pixel_mse": 870.1505578142715
+  }
+}

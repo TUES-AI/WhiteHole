@@ -30,13 +30,26 @@ from scripts.reacher_distracting_control import (
 )
 from scripts.visualize_reacher_shifts import (
     VARIANTS,
+    camera_phase_from_seed,
+    canonicalize_dynamic_frame,
     color_grade,
+    make_env as make_render_env,
     medium_variation_options,
+    render_source_background,
     render_variant,
+    set_dynamic_camera,
     set_hard_camera,
 )
 from scripts.reacher_conv_adapter import AdaptedLeWM, build_input_adapter
 from scripts.reacher_movie_adapter import build_movie_encoder
+
+
+DYNAMIC_CAMERA_VARIANTS = (
+    "dynamic_camera",
+    "dynamic_camera_homography",
+    "dynamic_camera_oracle",
+)
+EVAL_VARIANTS = VARIANTS + DYNAMIC_CAMERA_VARIANTS[1:]
 
 
 class ReacherRenderShiftWrapper(gym.Wrapper):
@@ -60,8 +73,17 @@ class ReacherRenderShiftWrapper(gym.Wrapper):
             if is_dcs_variant(variant)
             else None
         )
+        self.camera_step = 0
+        self.camera_phase_offset = 0.0
+        self.source_background = (
+            render_source_background(224)
+            if variant == "dynamic_camera_oracle"
+            else None
+        )
 
     def reset(self, *args, **kwargs):
+        self.camera_step = 0
+        self.camera_phase_offset = camera_phase_from_seed(kwargs.get("seed"))
         if self.variant == "medium_visual":
             options = dict(kwargs.get("options") or {})
             values = dict(options.get("variation_values") or {})
@@ -72,6 +94,12 @@ class ReacherRenderShiftWrapper(gym.Wrapper):
         obs, info = self.env.reset(*args, **kwargs)
         if self.variant == "hard_camera":
             set_hard_camera(self.env.unwrapped)
+        elif self.variant in DYNAMIC_CAMERA_VARIANTS:
+            set_dynamic_camera(
+                self.env.unwrapped,
+                step=self.camera_step,
+                phase_offset=self.camera_phase_offset,
+            )
         if self.background is not None:
             self.background.configure_episode(0, 0)
             self.background.apply(self.env.unwrapped.env.physics)
@@ -83,25 +111,42 @@ class ReacherRenderShiftWrapper(gym.Wrapper):
             self.background.apply(self.env.unwrapped.env.physics)
 
     def step(self, action):
-        transition = self.env.step(action)
+        result = self.env.step(action)
+        self.camera_step += 1
         if self.background is not None:
             self.background.advance(self.env.unwrapped.env.physics)
-        return transition
+        return result
 
     def render(self, *args, **kwargs):
         if self.variant == "hard_camera":
             set_hard_camera(self.env.unwrapped)
+        elif self.variant in DYNAMIC_CAMERA_VARIANTS:
+            set_dynamic_camera(
+                self.env.unwrapped,
+                step=self.camera_step,
+                phase_offset=self.camera_phase_offset,
+            )
         if self.background is not None:
             self.background.apply(self.env.unwrapped.env.physics)
         frame = self.env.render(*args, **kwargs)
         if self.variant == "medium_visual":
             frame = color_grade(frame)
+        elif self.variant in DYNAMIC_CAMERA_VARIANTS[1:]:
+            background = self.source_background
+            if background is not None and background.shape != frame.shape:
+                background = render_source_background(frame.shape[0])
+            frame = canonicalize_dynamic_frame(
+                frame,
+                step=self.camera_step,
+                phase_offset=self.camera_phase_offset,
+                source_background=background,
+            )
         return frame
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Evaluate LeWM Reacher on source/medium/hard visual domains."
+        description="Evaluate LeWM Reacher on source and shifted visual domains."
     )
     parser.add_argument("--variants", nargs="+", default=list(VARIANTS))
     parser.add_argument("--num-eval", type=int, default=30)
@@ -266,29 +311,74 @@ def shifted_render_state(
     goal_offset: int,
     background_video: str | None,
     background_seed: int,
+    camera_step: float = 0.0,
 ) -> None:
+    if variant == "source":
+        return
+
     render_kwargs = {
         "background_video": background_video,
         "background_seed": background_seed,
         "background_episode_ids": episodes_idx,
     }
+
+    seeds = init_state.get("seed")
+    phase_offsets = None
+    if seeds is not None and variant in DYNAMIC_CAMERA_VARIANTS:
+        phase_offsets = np.asarray(
+            [camera_phase_from_seed(seed) for seed in seeds], dtype=np.float64
+        )
+    elif variant in DYNAMIC_CAMERA_VARIANTS:
+        phase_offsets = np.zeros(len(init_state["qpos"]), dtype=np.float64)
+
+    render_variant_name = (
+        "dynamic_camera" if variant in DYNAMIC_CAMERA_VARIANTS else variant
+    )
     init_pixels = render_variant(
         {"qpos": init_state["qpos"], "qvel": init_state["qvel"]},
-        variant,
+        render_variant_name,
         image_size=224,
         background_step_indices=start_steps,
         **render_kwargs,
+        camera_steps=camera_step,
+        camera_phase_offsets=phase_offsets,
     )
     goal_qvel = goal_state.get("goal_qvel")
     if goal_qvel is None:
         goal_qvel = np.zeros_like(init_state["qvel"])
     goal_pixels = render_variant(
         {"qpos": goal_state["goal_qpos"], "qvel": goal_qvel},
-        variant,
+        render_variant_name,
         image_size=224,
         background_step_indices=np.asarray(start_steps) + goal_offset,
         **render_kwargs,
+        camera_steps=camera_step,
+        camera_phase_offsets=phase_offsets,
     )
+    if variant in DYNAMIC_CAMERA_VARIANTS[1:]:
+        background = (
+            render_source_background(224)
+            if variant == "dynamic_camera_oracle"
+            else None
+        )
+        init_pixels = [
+            canonicalize_dynamic_frame(
+                frame,
+                step=camera_step,
+                phase_offset=float(phase_offsets[index]),
+                source_background=background,
+            )
+            for index, frame in enumerate(init_pixels)
+        ]
+        goal_pixels = [
+            canonicalize_dynamic_frame(
+                frame,
+                step=camera_step,
+                phase_offset=float(phase_offsets[index]),
+                source_background=background,
+            )
+            for index, frame in enumerate(goal_pixels)
+        ]
     init_state["pixels"] = np.stack(init_pixels)
     goal_state["goal"] = np.stack(goal_pixels)
 
@@ -366,6 +456,7 @@ def evaluate_shifted_from_dataset(
         goal_offset,
         background_video,
         background_seed,
+        camera_step=0.0,
     )
 
     reset_seed = init_state.get("seed")
@@ -400,6 +491,32 @@ def evaluate_shifted_from_dataset(
                 ).copy()
 
     goal_snapshot = {k: world.infos[k].copy() for k in goal_state}
+    dynamic_goal_state = None
+    dynamic_phase_offsets = None
+    if variant in DYNAMIC_CAMERA_VARIANTS:
+        goal_qvel = goal_state.get("goal_qvel")
+        if goal_qvel is None:
+            goal_qvel = np.zeros_like(init_state["qvel"])
+        dynamic_goal_state = {
+            "qpos": goal_state["goal_qpos"],
+            "qvel": goal_qvel,
+        }
+        seeds = init_state.get("seed")
+        if seeds is None:
+            dynamic_phase_offsets = np.zeros(n, dtype=np.float64)
+        else:
+            dynamic_phase_offsets = np.asarray(
+                [camera_phase_from_seed(seed) for seed in seeds], dtype=np.float64
+            )
+    dynamic_goal_env = (
+        make_render_env("dynamic_camera") if dynamic_goal_state is not None else None
+    )
+    oracle_background = (
+        render_source_background(224)
+        if variant == "dynamic_camera_oracle"
+        else None
+    )
+    camera_step = 0
     results = {
         "success_rate": 0.0,
         "episode_successes": np.zeros(n, dtype=bool),
@@ -407,10 +524,43 @@ def evaluate_shifted_from_dataset(
     }
 
     def on_step(active_world):
+        nonlocal camera_step
+        camera_step += 1
+        if dynamic_goal_state is not None:
+            goal_pixels = np.stack(
+                render_variant(
+                    dynamic_goal_state,
+                    "dynamic_camera",
+                    image_size=224,
+                    camera_steps=camera_step,
+                    camera_phase_offsets=dynamic_phase_offsets,
+                    render_env=dynamic_goal_env,
+                )
+            )
+            if variant in DYNAMIC_CAMERA_VARIANTS[1:]:
+                goal_pixels = np.stack(
+                    [
+                        canonicalize_dynamic_frame(
+                            frame,
+                            step=camera_step,
+                            phase_offset=float(dynamic_phase_offsets[index]),
+                            source_background=oracle_background,
+                        )
+                        for index, frame in enumerate(goal_pixels)
+                    ]
+                )
+            goal_snapshot["goal"] = np.broadcast_to(
+                goal_pixels[:, None, ...],
+                shape_prefix + goal_pixels.shape[1:],
+            ).copy()
         active_world.infos.update(deepcopy(goal_snapshot))
         results["episode_successes"] |= active_world.terminateds
 
-    world._run(max_steps=eval_budget, mode="wait", on_step=on_step)
+    try:
+        world._run(max_steps=eval_budget, mode="wait", on_step=on_step)
+    finally:
+        if dynamic_goal_env is not None:
+            dynamic_goal_env.close()
     results["success_rate"] = (
         float(results["episode_successes"].sum()) / n * 100.0
     )
@@ -526,8 +676,10 @@ def main() -> None:
     }
 
     for variant in args.variants:
-        if variant not in VARIANTS:
-            raise ValueError(f"Unknown variant {variant!r}; choose from {VARIANTS}")
+        if variant not in EVAL_VARIANTS:
+            raise ValueError(
+                f"Unknown variant {variant!r}; choose from {EVAL_VARIANTS}"
+            )
         start_time = time.time()
         policy = build_policy(args, dataset, model, device)
         world = make_world(

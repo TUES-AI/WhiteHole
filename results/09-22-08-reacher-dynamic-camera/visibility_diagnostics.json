@@ -1,0 +1,19 @@
+{
+  "frames": 50,
+  "orange_pixels": {
+    "minimum": 135,
+    "median": 304.5,
+    "maximum": 576
+  },
+  "nonblack_fraction": {
+    "minimum": 0.8378706951530612,
+    "mean": 0.9665975765306122
+  },
+  "orange_bbox_global": {
+    "xmin": 64,
+    "xmax": 132,
+    "ymin": 38,
+    "ymax": 115
+  },
+  "frames_touching_5px_border": 0
+}

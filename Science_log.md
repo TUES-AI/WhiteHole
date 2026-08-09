@@ -77,5 +77,30 @@ Experiment description: Trained a 97,731-parameter identity-initialized coordina
 | Coordinate U-Net, seed 124 | 97,731 | `0.1762` | **86/100** | **35/100** |
 
 Seed 123 improved bear success over STN-only by 19 points (95% paired bootstrap CI +8 to +30; exact `p=0.0013`). Seed 124 improved it by 25 points (+14 to +36; `p=7.0e-5`) and beat unadapted bear success by 16 points (+4 to +28; `p=0.0139`). Two-seed means were 83% source and 32% bear. Frozen-core gradient tensors were zero. This establishes a small non-affine adapter capacity upper bound, not a target-only adaptation solution: the successful loss requires exact source renders and strong pixel supervision unavailable in ordinary deployment. The target-only 83,052-parameter residual CNN screened at 3/30 bear success despite very low dynamics MSE.
+---
 
+09-22-08 | Reacher dynamic-camera hard benchmark
+Experiment description: Added a `dynamic_camera` observation shift that completes a camera orbit every 24 environment steps while smoothly varying radius (`0.20`-`0.28`), height (`0.64`-`0.84`), field of view (`40`-`52` degrees), and look-at offset. Each episode receives a deterministic seed-derived phase. Physics and target state are unchanged, and the evaluator rerenders the goal at the same instantaneous camera as the live observation. Trained an STN-only MoVie adapter with the fixed-camera protocol: 83,372 trainable parameters, 256 target transitions, 64 validation transitions, batch size 32, 512 updates, and frozen encoder/projector/dynamics/control. Code: `scripts/visualize_reacher_shifts.py`, `scripts/eval_reacher_shifts.py`, and `scripts/train_reacher_movie_adapter.py`. Results: `results/09-22-08-reacher-dynamic-camera/`.
+
+| Dynamic-camera evaluation on 30 matched starts | Success |
+|---|---:|
+| Unadapted LeWM | 3/30 (10.0%) |
+| Fixed-hard-camera STN, zero-shot | 4/30 (13.3%) |
+| Dynamic-camera-trained STN | 4/30 (13.3%) |
+
+The fixed-camera and dynamic-trained STNs each differ from unadapted LeWM by only one success (paired exact `p=1.0`), and they differ from each other on two discordant starts with equal aggregate success (`p=1.0`). Dynamic-camera STN training reduced held-out dynamics MSE from `0.4676` to `0.2883`, far less than the same STN budget's `0.2664` to `0.0876` reduction on the fixed hard camera. In the 50-frame visual diagnostic, orange arm pixels were detected in every frame (`135` minimum), at least 83.8% of pixels were nonblack, and the arm never touched a five-pixel image border. This is therefore a difficult visible observation-dynamics shift rather than an occlusion failure. Limitations: 30 control starts, one training seed, and one dynamic-camera schedule; this establishes a stress-test candidate, not a final benchmark estimate.
+
+---
+
+09-23-08 | Reacher calibrated projective canonicalization oracle
+Experiment description: Used known MuJoCo camera extrinsics and vertical field of view to derive an eight-degree-of-freedom homography from the instantaneous dynamic-camera workspace plane (`z=0.015`) into LeWM's source camera. LeWM and its planner remained frozen. A second condition filled pixels outside the dynamic view with a source workspace background rendered after hiding every movable geom, so it contained no current arm or target state. Live and goal frames used the same synchronized camera transform. Code: `scripts/visualize_reacher_shifts.py`, `scripts/eval_reacher_shifts.py`, and `tests/test_reacher_visual_shifts.py`. Results: `results/09-22-08-reacher-dynamic-camera/`.
+
+| Evaluation on 100 matched starts | Success |
+|---|---:|
+| Source LeWM | 85/100 (85%) |
+| Raw dynamic camera | 12/100 (12%) |
+| Calibrated homography | **64/100 (64%)** |
+| Homography + static completion | **64/100 (64%)** |
+
+The homography improves over raw dynamic camera by 52 percentage points (paired 95% bootstrap CI +41 to +63), gaining on 55 raw failures and losing 3 raw successes (exact McNemar `p=2.26e-13`). It remains 21 points below source (CI -33 to -9; `p=0.00246`). Static completion and pure homography swap 8 successes in each direction (`p=1.0`), despite completion reducing the six-phase paired pixel MSE from `983.2` to `870.2`. This supports projective canonicalization as the primary mechanism, rejects static background completion as the explanation for the remaining gap, and again shows that pixel-level fit need not predict control. The immediate learned experiment is an image-conditioned projective transformer supervised by simulator camera pose, followed by a short-window temporal version without pose labels. Limitations: the oracle knows exact camera calibration, assumes an approximately planar workspace, and still loses information when source-view pixels are outside the dynamic camera.
 ---
