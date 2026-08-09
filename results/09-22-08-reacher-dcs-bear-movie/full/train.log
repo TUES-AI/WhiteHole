@@ -1,0 +1,23 @@
+/opt/venv/lib/python3.13/site-packages/stable_worldmodel/envs/__init__.py:215: UserWarning: ale-py not found; ALE/* envs are unavailable. Install with: pip install 'stable-worldmodel[env]' or pip install ale-py.
+  from stable_worldmodel.envs import ale  # noqa: F401
+20:52:59 | INFO  | __init__.py | Cached 'action' from '/proj/data/reacher-dcs-bear/reacher_random_states.h5'
+Rendering 320 dcs_bear_dynamic start/next transitions for target-only MoVie supervision...
+20:53:03 | INFO  | __init__.py | JAX version 0.11.0 available.
+20:53:05 | INFO  | atomic_chec~| [atomic_save] installed crash-safe checkpoint plugin (write to sibling .tmp + fsync + atomic rename)
+20:53:10 | INFO  | utils.py    | Loading quentinll/lewm-reacher from local cache...
+20:53:10 | INFO  | utils.py    | Loading checkpoint from folder /root/.stable_worldmodel/checkpoints/models--quentinll--lewm-reacher...
+20:53:10 | INFO  | utils.py    | Created ViT-tiny from scratch with config: {'hidden_size': 192, 'num_hidden_layers': 12, 'num_attention_heads': 3, 'intermediate_size': 768, 'image_size': 224, 'patch_size': 14}
+gradient_sanity stn=1.701398 visual=3.087412 frozen_core=0
+baseline_val_dynamics=0.273145 stn_params=83372 visual_params=6294144
+epoch 001 train_dyn=0.291717 val_dyn=0.270545 val_loss=0.270545 val_swd=1.443762 val_std=0.296236
+epoch 008 train_dyn=0.268202 val_dyn=0.248024 val_loss=0.248024 val_swd=1.418935 val_std=0.290883
+epoch 016 train_dyn=0.221953 val_dyn=0.201659 val_loss=0.201659 val_swd=1.407136 val_std=0.267619
+epoch 024 train_dyn=0.187361 val_dyn=0.172413 val_loss=0.172413 val_swd=1.480417 val_std=0.207815
+epoch 032 train_dyn=0.167860 val_dyn=0.155834 val_loss=0.155834 val_swd=1.508686 val_std=0.179199
+epoch 040 train_dyn=0.153694 val_dyn=0.142398 val_loss=0.142398 val_swd=1.501544 val_std=0.168119
+epoch 048 train_dyn=0.141746 val_dyn=0.131027 val_loss=0.131027 val_swd=1.491749 val_std=0.157356
+epoch 056 train_dyn=0.133406 val_dyn=0.123946 val_loss=0.123946 val_swd=1.478302 val_std=0.153269
+epoch 064 train_dyn=0.125799 val_dyn=0.116917 val_loss=0.116917 val_swd=1.461925 val_std=0.151414
+best_val_objective: 0.116917
+wrote: /proj/data/reacher-dcs-bear/experiment-v2/full/movie_latest.ckpt
+wrote: /proj/data/reacher-dcs-bear/experiment-v2/full/report.json

@@ -1,0 +1,36 @@
+/opt/venv/lib/python3.13/site-packages/stable_worldmodel/envs/__init__.py:215: UserWarning: ale-py not found; ALE/* envs are unavailable. Install with: pip install 'stable-worldmodel[env]' or pip install ale-py.
+  from stable_worldmodel.envs import ale  # noqa: F401
+21:23:16 | INFO  | __init__.py | MUJOCO_GL=egl, attempting to import specified OpenGL backend.
+21:23:16 | INFO  | __init__.py | Failed to load library ( 'libOpenGL.so.0' ): libOpenGL.so.0: cannot open shared object file: No such file or directory
+21:23:16 | INFO  | __init__.py | No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+21:23:16 | INFO  | __init__.py | Failed to load library ( 'libOpenGL.so.0' ): libOpenGL.so.0: cannot open shared object file: No such file or directory
+21:23:16 | INFO  | __init__.py | Failed to load library ( 'libOpenGL.so.0' ): libOpenGL.so.0: cannot open shared object file: No such file or directory
+21:23:16 | INFO  | __init__.py | MuJoCo library version is: 3.11.0
+21:23:16 | INFO  | __init__.py | Cached 'action' from '/proj/data/reacher-dcs-bear/reacher_random_states.h5'
+21:23:16 | INFO  | utils.py    | Loading quentinll/lewm-reacher from local cache...
+21:23:16 | INFO  | utils.py    | Loading checkpoint from folder /root/.stable_worldmodel/checkpoints/models--quentinll--lewm-reacher...
+21:23:18 | INFO  | __init__.py | JAX version 0.11.0 available.
+21:23:19 | INFO  | atomic_chec~| [atomic_save] installed crash-safe checkpoint plugin (write to sibling .tmp + fsync + atomic rename)
+21:23:19 | INFO  | utils.py    | Created ViT-tiny from scratch with config: {'hidden_size': 192, 'num_hidden_layers': 12, 'num_attention_heads': 3, 'intermediate_size': 768, 'image_size': 224, 'patch_size': 14}
+/opt/venv/lib/python3.13/site-packages/gymnasium/envs/registration.py:729: UserWarning: [33mWARN: The environment is being initialised with render_mode='rgb_array' that is not in the possible render_modes ([]).[0m
+  logger.warn(
+/opt/venv/lib/python3.13/site-packages/gymnasium/envs/registration.py:729: UserWarning: [33mWARN: The environment is being initialised with render_mode='rgb_array' that is not in the possible render_modes ([]).[0m
+  logger.warn(
+CEM solve time: 65.5327 seconds
+CEM solve time: 61.8259 seconds
+source: 13.0% (13/100) in 212.0s
+CEM solve time: 65.8601 seconds
+CEM solve time: 63.2703 seconds
+dcs_bear_dynamic: 8.0% (8/100) in 240.5s
+wrote: /proj/data/reacher-dcs-bear/experiment-v2/eval_stn_encoder.json
+episode_range:
+- 128
+- 255
+goal_offset_steps: 25
+eval_budget: 50
+horizon: 5
+receding_horizon: 5
+action_block: 5
+num_samples: 300
+cem_steps: 30
+topk: 30

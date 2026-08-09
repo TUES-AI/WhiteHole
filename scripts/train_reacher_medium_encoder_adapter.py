@@ -74,7 +74,12 @@ def resolve_cache_dir(arg: str | None) -> Path:
 
 
 def sample_transition_rows(
-    dataset, count: int, seed: int, action_block: int
+    dataset,
+    count: int,
+    seed: int,
+    action_block: int,
+    episode_min: int | None = None,
+    episode_max: int | None = None,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, dict, dict]:
     col_name = "episode_idx" if "episode_idx" in dataset.column_names else "ep_idx"
     ep_idx = dataset.get_col_data(col_name)
@@ -88,6 +93,10 @@ def sample_transition_rows(
         & (ep_idx[rows + action_block] == ep_idx[rows])
         & (step_idx[rows + action_block] == step_idx[rows] + action_block)
     )
+    if episode_min is not None:
+        valid &= ep_idx[rows] >= episode_min
+    if episode_max is not None:
+        valid &= ep_idx[rows] <= episode_max
     candidates = rows[valid]
 
     action_offsets = np.arange(action_block)

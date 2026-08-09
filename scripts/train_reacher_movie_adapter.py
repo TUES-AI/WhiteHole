@@ -19,6 +19,11 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from scripts.reacher_distracting_control import (
+    DCS_VARIANTS,
+    DavisBearBackground,
+    is_dcs_variant,
+)
 from scripts.reacher_movie_adapter import build_movie_encoder
 from scripts.train_reacher_medium_encoder_adapter import (
     fit_action_scaler,
@@ -46,7 +51,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--cache-dir", default=None)
     parser.add_argument(
         "--target-variant",
-        choices=("medium_visual", "hard_camera"),
+        choices=("medium_visual", "hard_camera", *DCS_VARIANTS),
         default="hard_camera",
     )
     parser.add_argument(
@@ -71,12 +76,32 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--joint-swd-weight", type=float, default=0.0)
     parser.add_argument("--swd-projections", type=int, default=128)
     parser.add_argument("--num-workers", type=int, default=0)
+    parser.add_argument("--background-video", default=None)
+    parser.add_argument("--background-seed", type=int, default=0)
+    parser.add_argument("--episode-min", type=int, default=None)
+    parser.add_argument("--episode-max", type=int, default=None)
     return parser.parse_args()
 
 
-def render_images(rows: dict, variant: str) -> torch.Tensor:
+def render_images(
+    rows: dict,
+    variant: str,
+    background_video: str | None = None,
+    background_seed: int = 0,
+) -> torch.Tensor:
     states = {"qpos": rows["qpos"], "qvel": rows["qvel"]}
-    frames = np.stack(render_variant(states, variant, image_size=224))
+    episode_key = "episode_idx" if "episode_idx" in rows else "ep_idx"
+    frames = np.stack(
+        render_variant(
+            states,
+            variant,
+            image_size=224,
+            background_video=background_video,
+            background_seed=background_seed,
+            background_episode_ids=rows[episode_key],
+            background_step_indices=rows["step_idx"],
+        )
+    )
     return normalize_images(frames)
 
 
@@ -239,20 +264,35 @@ def main() -> None:
     cache_dir = resolve_cache_dir(args.cache_dir)
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
-    dataset = swm.data.HDF5Dataset(
-        args.dataset_name, keys_to_cache=["action"], cache_dir=cache_dir
+    dataset = swm.data.load_dataset(
+        args.dataset_name, keys_to_cache=["action"], cache_dir=str(cache_dir)
     )
     total = args.train_samples + args.val_samples
     start_rows, next_rows, raw_actions, start_data, next_data = sample_transition_rows(
-        dataset, total, args.seed, args.action_block
+        dataset,
+        total,
+        args.seed,
+        args.action_block,
+        episode_min=args.episode_min,
+        episode_max=args.episode_max,
     )
 
     print(
         f"Rendering {total} {args.target_variant} start/next transitions "
         "for target-only MoVie supervision..."
     )
-    target_start_images = render_images(start_data, args.target_variant)
-    target_next_images = render_images(next_data, args.target_variant)
+    target_start_images = render_images(
+        start_data,
+        args.target_variant,
+        args.background_video,
+        args.background_seed,
+    )
+    target_next_images = render_images(
+        next_data,
+        args.target_variant,
+        args.background_video,
+        args.background_seed,
+    )
     source_start_images = render_images(start_data, "source")
     source_next_images = render_images(next_data, "source")
 
@@ -265,7 +305,13 @@ def main() -> None:
     train_slice = slice(0, args.train_samples)
     val_slice = slice(args.train_samples, total)
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device(
+        "cuda"
+        if torch.cuda.is_available()
+        else "mps"
+        if torch.backends.mps.is_available()
+        else "cpu"
+    )
     model = swm.wm.utils.load_pretrained(args.policy).to(device).eval()
     model.interpolate_pos_encoding = True
     model.encoder = build_movie_encoder(
@@ -342,6 +388,19 @@ def main() -> None:
 
     baseline_val = average_metrics(
         model, val_tensors, args.batch_size, device, args
+    )
+    source_tensors = (
+        source_start_images,
+        source_next_images,
+        actions,
+        source_start_images,
+        source_next_images,
+        source_start_latents,
+        source_next_latents,
+    )
+    source_val_tensors = tuple(tensor[val_slice] for tensor in source_tensors)
+    baseline_source_val = average_metrics(
+        model, source_val_tensors, args.batch_size, device, args
     )
     baseline_target_latents = encode_batches(
         model, target_start_images[val_slice], args.batch_size, device
@@ -431,12 +490,22 @@ def main() -> None:
         model.projector.load_state_dict(best_state["projector"], strict=True)
 
     final_val = average_metrics(model, val_tensors, args.batch_size, device, args)
+    final_source_val = average_metrics(
+        model, source_val_tensors, args.batch_size, device, args
+    )
     final_target_latents = encode_batches(
         model, target_start_images[val_slice], args.batch_size, device
     )
     final_source_latents = encode_batches(
         model, source_start_images[val_slice], args.batch_size, device
     )
+    background_metadata = None
+    if is_dcs_variant(args.target_variant):
+        background_metadata = DavisBearBackground(
+            args.background_video,
+            dynamic=args.target_variant == "dcs_bear_dynamic",
+            seed=args.background_seed,
+        ).metadata()
     adapter_config = {
         "type": "movie_stn",
         "target_variant": args.target_variant,
@@ -451,10 +520,12 @@ def main() -> None:
         "dataset_name": args.dataset_name,
         "cache_dir": str(cache_dir),
         "target_variant": args.target_variant,
+        "background": background_metadata,
         "seed": args.seed,
         "device": str(device),
         "train_samples": args.train_samples,
         "val_samples": args.val_samples,
+        "episode_range": [args.episode_min, args.episode_max],
         "start_rows": [int(x) for x in start_rows],
         "next_rows": [int(x) for x in next_rows],
         "adapter_config": adapter_config,
@@ -482,8 +553,10 @@ def main() -> None:
         },
         "gradient_sanity": gradient_sanity,
         "baseline_val_metrics": baseline_val,
+        "baseline_source_val_metrics": baseline_source_val,
         "best_val_objective": best_val,
         "final_val_metrics": final_val,
+        "final_source_val_metrics": final_source_val,
         "paired_diagnostics_not_used_for_training": {
             "baseline_target_to_source_mse": float(
                 F.mse_loss(baseline_target_latents, baseline_source_latents)

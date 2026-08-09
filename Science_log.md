@@ -51,3 +51,17 @@ All new adaptations significantly improved hard-camera success over unadapted Le
 The distribution objective reduced held-out latent SWD from `0.5415` to `0.0477`, predicted-transition SWD from `0.3786` to `0.0572`, and joint state/action/transition SWD from `0.3298` to `0.0349`. Source-retention latent MSE was `0.1559` for STN-only, `0.1283` for the unregularized full update, `0.0659` with source identity, and `0.1136` with SWD. Frozen-core gradient tensors were zero in every condition. The downstream ranking does not follow validation dynamics MSE, reinforcing that one-step fit and distribution alignment are diagnostics rather than substitutes for control evaluation. Limitations: one training seed, one identity/SWD weight setting, offline pre-adaptation, and one hard-camera shift.
 
 ---
+
+09-22-08 | Reacher dynamic DAVIS bear MoVie-style scope ablation
+Experiment description: Replaced Reacher's MuJoCo sky texture with deterministic dynamic DAVIS 2017 `bear` frames and made its floor transparent, following the Distracting Control Suite background mechanism without its TensorFlow reader. Compared unadapted LeWM, STNs only, STNs plus encoder with projector frozen, and STNs plus encoder and projector. Adaptation used 256 transitions and 64 validation transitions from episodes 0-127, seed 123, batch size 32, 512 updates, and one-step frozen-dynamics MSE; dynamics, action encoder, and control remained frozen. All rows used 100 matched evaluation starts from disjoint episodes 128-255 and the full CEM protocol. The unavailable private `dmc/reacher_random` cache was replaced by one shared 256-episode random-policy state/action dataset. Code was executed from uncommitted changes layered on `3279d92`; result folder: `results/09-22-08-reacher-dcs-bear-movie/`.
+
+| Condition | Trainable parameters | Bear val dynamics MSE | Source | Dynamic bear |
+|---|---:|---:|---:|---:|
+| Unadapted LeWM | 0 | `0.2731` | **82/100** | **18/100** |
+| STNs + encoder + projector | 6,377,516 | **`0.1169`** | **13/100** | 9/100 |
+| **STNs only** | **83,372** | `0.1975` | 6/100 | 16/100 |
+| STNs + encoder, projector frozen | 5,584,748 | `0.1382` | **13/100** | 8/100 |
+
+The dynamic bear background created a 64-point unadapted source-to-target drop. Relative to unadapted bear control, the full, STN-only, and STN+encoder rows changed success by -9 points (95% paired bootstrap CI -18 to 0; exact `p=0.093`), -2 (-11 to +7; `p=0.832`), and -10 (-19 to -1; `p=0.052`). Every adaptation lowered bear one-step MSE but failed to recover control and reduced source success by 69-76 points. Frozen-core gradient tensors were zero. This is a difficult negative result for the tested offline MoVie-style adapters and budget, not proof that all MoVie-derived methods must fail. Limitations: one training seed, one dynamic video, no static-background row, and a new internally matched dataset rather than the collaborator's private cache.
+
+---

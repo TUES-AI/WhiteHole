@@ -1,0 +1,42 @@
+{
+  "state_unchanged": true,
+  "state_fields_checked": [
+    "qpos",
+    "qvel",
+    "qacc",
+    "ctrl",
+    "act",
+    "time"
+  ],
+  "deterministic_same_state_frame": true,
+  "dynamic_next_frame_changed": true,
+  "source_to_bear_mean_absolute_pixel_difference": 44.57834243774414,
+  "bear_consecutive_mean_absolute_pixel_difference": 16.890871047973633,
+  "qpos": [
+    0.3067042906681201,
+    1.2018441467133076
+  ],
+  "qvel": [
+    0.0,
+    0.0
+  ],
+  "episode": 7,
+  "step": 11,
+  "background": {
+    "video_path": "/proj/data/reacher-dcs-bear/bear_raw_24fps.mp4",
+    "video_filename": "bear_raw_24fps.mp4",
+    "sha256": "46f05e52f884a5180cd44ee0448e461fc744f2665e0ae5215e2d52ba1fac28bd",
+    "bytes": 2015436,
+    "frame_count": 82,
+    "resolution": [
+      854,
+      480
+    ],
+    "fps": 24.0,
+    "dynamic": true,
+    "seed": 0,
+    "ground_plane_alpha": 0.0,
+    "sky_texture_height": 800,
+    "source": "https://huggingface.co/datasets/emirkisa/DAVIS-2017-480p-mp4/resolve/872ccd3c5d4d9c98016798e7af0342b33ec6ab4d/bear_raw_24fps.mp4"
+  }
+}

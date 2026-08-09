@@ -6,12 +6,14 @@ That keeps dynamics/state fixed and isolates the observation shift:
 - source: default LeWM Reacher rendering.
 - medium_visual: material, lighting, and deterministic color-grade shift.
 - hard_camera: oblique fixed MuJoCo camera perspective.
+- dcs_bear_static/dynamic: DAVIS bear frames in the MuJoCo sky texture.
 """
 
 from __future__ import annotations
 
 import argparse
 import os
+import sys
 from pathlib import Path
 
 import cv2
@@ -21,8 +23,18 @@ import stable_worldmodel as swm
 from dm_control.utils import transformations
 from stable_worldmodel.envs.dmcontrol.reacher import ReacherDMControlWrapper
 
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
-VARIANTS = ("source", "medium_visual", "hard_camera")
+from scripts.reacher_distracting_control import (
+    DCS_VARIANTS,
+    DavisBearBackground,
+    is_dcs_variant,
+)
+
+
+VARIANTS = ("source", "medium_visual", "hard_camera", *DCS_VARIANTS)
 HARD_CAMERA_POS = np.array([0.16, -0.16, 0.82], dtype=np.float64)
 HARD_CAMERA_TARGET = np.array([0.0, 0.0, 0.0], dtype=np.float64)
 HARD_CAMERA_FOVY = 42.0
@@ -41,6 +53,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--image-size", type=int, default=224)
     parser.add_argument("--fps", type=int, default=10)
     parser.add_argument("--contact-frames", type=int, default=6)
+    parser.add_argument(
+        "--background-video",
+        default=None,
+        help=(
+            "DAVIS bear MP4. Defaults to DCS_BACKGROUND_VIDEO or downloads "
+            "the pinned bear_raw_24fps.mp4 mirror into the Hugging Face cache."
+        ),
+    )
+    parser.add_argument("--background-seed", type=int, default=0)
     return parser.parse_args()
 
 
@@ -128,7 +149,11 @@ def set_hard_camera(env: ReacherDMControlWrapper) -> None:
     env.camera_id = camera_id
 
 
-def make_env(variant: str) -> ReacherDMControlWrapper:
+def make_env(
+    variant: str,
+    background_video: str | Path | None = None,
+    background_seed: int = 0,
+) -> ReacherDMControlWrapper:
     env = ReacherDMControlWrapper(task="qpos_match", seed=0, render_mode="rgb_array")
     if variant == "medium_visual":
         env.reset(seed=0, options=medium_variation_options())
@@ -136,6 +161,12 @@ def make_env(variant: str) -> ReacherDMControlWrapper:
         env.reset(seed=0)
     if variant == "hard_camera":
         set_hard_camera(env)
+    if is_dcs_variant(variant):
+        env._dcs_background = DavisBearBackground(
+            background_video,
+            dynamic=variant == "dcs_bear_dynamic",
+            seed=background_seed,
+        )
     return env
 
 
@@ -143,11 +174,27 @@ def render_variant(
     states: dict,
     variant: str,
     image_size: int,
+    background_video: str | Path | None = None,
+    background_seed: int = 0,
+    background_episode_ids: np.ndarray | list[int] | None = None,
+    background_step_indices: np.ndarray | list[int] | None = None,
 ) -> list[np.ndarray]:
-    env = make_env(variant)
+    env = make_env(variant, background_video, background_seed)
+    num_states = len(states["qpos"])
+    if background_episode_ids is None:
+        background_episode_ids = np.zeros(num_states, dtype=int)
+    if background_step_indices is None:
+        background_step_indices = np.arange(num_states)
+
     frames = []
-    for qpos, qvel in zip(states["qpos"], states["qvel"]):
+    for index, (qpos, qvel) in enumerate(zip(states["qpos"], states["qvel"])):
         env.set_state(qpos, qvel)
+        if is_dcs_variant(variant):
+            env._dcs_background.configure_episode(
+                int(background_episode_ids[index]),
+                int(background_step_indices[index]),
+            )
+            env._dcs_background.apply(env.env.physics)
         frame = env.render(width=image_size, height=image_size)
         if variant == "medium_visual":
             frame = color_grade(frame)
@@ -196,7 +243,7 @@ def main() -> None:
     out_dir = Path(args.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    dataset = swm.data.HDF5Dataset(args.dataset_name, cache_dir=cache_dir)
+    dataset = swm.data.load_dataset(args.dataset_name, cache_dir=str(cache_dir))
     states = get_episode_window(
         dataset,
         episode=args.episode,
@@ -204,8 +251,17 @@ def main() -> None:
         num_frames=args.num_frames,
     )
 
+    episode_key = (
+        "episode_idx" if "episode_idx" in states else "ep_idx"
+    )
+    render_kwargs = {
+        "background_video": args.background_video,
+        "background_seed": args.background_seed,
+        "background_episode_ids": states[episode_key],
+        "background_step_indices": states["step_idx"],
+    }
     frames_by_variant = {
-        variant: render_variant(states, variant, args.image_size)
+        variant: render_variant(states, variant, args.image_size, **render_kwargs)
         for variant in VARIANTS
     }
 

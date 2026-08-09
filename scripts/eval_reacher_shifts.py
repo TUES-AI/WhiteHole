@@ -24,6 +24,10 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from scripts.reacher_distracting_control import (
+    DavisBearBackground,
+    is_dcs_variant,
+)
 from scripts.visualize_reacher_shifts import (
     VARIANTS,
     color_grade,
@@ -38,9 +42,24 @@ from scripts.reacher_movie_adapter import build_movie_encoder
 class ReacherRenderShiftWrapper(gym.Wrapper):
     """Apply a visual-domain shift while leaving Reacher state/dynamics intact."""
 
-    def __init__(self, env: gym.Env, variant: str):
+    def __init__(
+        self,
+        env: gym.Env,
+        variant: str,
+        background_video: str | None = None,
+        background_seed: int = 0,
+    ):
         super().__init__(env)
         self.variant = variant
+        self.background = (
+            DavisBearBackground(
+                background_video,
+                dynamic=variant == "dcs_bear_dynamic",
+                seed=background_seed,
+            )
+            if is_dcs_variant(variant)
+            else None
+        )
 
     def reset(self, *args, **kwargs):
         if self.variant == "medium_visual":
@@ -53,11 +72,27 @@ class ReacherRenderShiftWrapper(gym.Wrapper):
         obs, info = self.env.reset(*args, **kwargs)
         if self.variant == "hard_camera":
             set_hard_camera(self.env.unwrapped)
+        if self.background is not None:
+            self.background.configure_episode(0, 0)
+            self.background.apply(self.env.unwrapped.env.physics)
         return obs, info
+
+    def configure_background(self, episode_id: int, step: int) -> None:
+        if self.background is not None:
+            self.background.configure_episode(episode_id, step)
+            self.background.apply(self.env.unwrapped.env.physics)
+
+    def step(self, action):
+        transition = self.env.step(action)
+        if self.background is not None:
+            self.background.advance(self.env.unwrapped.env.physics)
+        return transition
 
     def render(self, *args, **kwargs):
         if self.variant == "hard_camera":
             set_hard_camera(self.env.unwrapped)
+        if self.background is not None:
+            self.background.apply(self.env.unwrapped.env.physics)
         frame = self.env.render(*args, **kwargs)
         if self.variant == "medium_visual":
             frame = color_grade(frame)
@@ -87,6 +122,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--num-samples", type=int, default=300)
     parser.add_argument("--cem-steps", type=int, default=30)
     parser.add_argument("--topk", type=int, default=30)
+    parser.add_argument("--background-video", default=None)
+    parser.add_argument("--background-seed", type=int, default=0)
+    parser.add_argument("--episode-min", type=int, default=None)
+    parser.add_argument("--episode-max", type=int, default=None)
     return parser.parse_args()
 
 
@@ -154,7 +193,14 @@ def get_episodes_length(dataset, episodes):
     )
 
 
-def sample_eval_points(dataset, seed: int, num_eval: int, goal_offset_steps: int):
+def sample_eval_points(
+    dataset,
+    seed: int,
+    num_eval: int,
+    goal_offset_steps: int,
+    episode_min: int | None = None,
+    episode_max: int | None = None,
+):
     col_name = "episode_idx" if "episode_idx" in dataset.column_names else "ep_idx"
     ep_indices, _ = np.unique(dataset.get_col_data(col_name), return_index=True)
     episode_len = get_episodes_length(dataset, ep_indices)
@@ -166,6 +212,11 @@ def sample_eval_points(dataset, seed: int, num_eval: int, goal_offset_steps: int
         [max_start_idx_dict[ep_id] for ep_id in dataset.get_col_data(col_name)]
     )
     valid_mask = dataset.get_col_data("step_idx") <= max_start_per_row
+    row_episodes = dataset.get_col_data(col_name)
+    if episode_min is not None:
+        valid_mask &= row_episodes >= episode_min
+    if episode_max is not None:
+        valid_mask &= row_episodes <= episode_max
     valid_indices = np.nonzero(valid_mask)[0]
 
     rng = np.random.default_rng(seed)
@@ -179,11 +230,22 @@ def sample_eval_points(dataset, seed: int, num_eval: int, goal_offset_steps: int
     return row_indices, rows[col_name].tolist(), rows["step_idx"].tolist()
 
 
-def make_world(variant: str, num_envs: int, max_episode_steps: int) -> swm.World:
+def make_world(
+    variant: str,
+    num_envs: int,
+    max_episode_steps: int,
+    background_video: str | None = None,
+    background_seed: int = 0,
+) -> swm.World:
     pre_wrappers = []
     if variant != "source":
         pre_wrappers.append(
-            partial(ReacherRenderShiftWrapper, variant=variant)
+            partial(
+                ReacherRenderShiftWrapper,
+                variant=variant,
+                background_video=background_video,
+                background_seed=background_seed,
+            )
         )
     return swm.World(
         env_name="swm/ReacherDMControl-v0",
@@ -195,14 +257,27 @@ def make_world(variant: str, num_envs: int, max_episode_steps: int) -> swm.World
     )
 
 
-def shifted_render_state(init_state: dict, goal_state: dict, variant: str) -> None:
-    if variant == "source":
-        return
-
+def shifted_render_state(
+    init_state: dict,
+    goal_state: dict,
+    variant: str,
+    episodes_idx,
+    start_steps,
+    goal_offset: int,
+    background_video: str | None,
+    background_seed: int,
+) -> None:
+    render_kwargs = {
+        "background_video": background_video,
+        "background_seed": background_seed,
+        "background_episode_ids": episodes_idx,
+    }
     init_pixels = render_variant(
         {"qpos": init_state["qpos"], "qvel": init_state["qvel"]},
         variant,
         image_size=224,
+        background_step_indices=start_steps,
+        **render_kwargs,
     )
     goal_qvel = goal_state.get("goal_qvel")
     if goal_qvel is None:
@@ -211,6 +286,8 @@ def shifted_render_state(init_state: dict, goal_state: dict, variant: str) -> No
         {"qpos": goal_state["goal_qpos"], "qvel": goal_qvel},
         variant,
         image_size=224,
+        background_step_indices=np.asarray(start_steps) + goal_offset,
+        **render_kwargs,
     )
     init_state["pixels"] = np.stack(init_pixels)
     goal_state["goal"] = np.stack(goal_pixels)
@@ -271,6 +348,8 @@ def evaluate_shifted_from_dataset(
     eval_budget,
     callables,
     variant,
+    background_video,
+    background_seed,
 ) -> dict:
     n = len(episodes_idx)
     assert n == world.num_envs
@@ -278,15 +357,38 @@ def evaluate_shifted_from_dataset(
     init_state, goal_state = extract_init_goal(
         dataset, episodes_idx, start_steps, goal_offset
     )
-    shifted_render_state(init_state, goal_state, variant)
+    shifted_render_state(
+        init_state,
+        goal_state,
+        variant,
+        episodes_idx,
+        start_steps,
+        goal_offset,
+        background_video,
+        background_seed,
+    )
 
-    world.reset(seed=init_state.get("seed"))
+    reset_seed = init_state.get("seed")
+    if reset_seed is not None:
+        reset_seed = [int(value) for value in reset_seed]
+    world.reset(seed=reset_seed)
 
     if callables:
         merged = {**init_state, **goal_state}
         for i in range(n):
+            world_env = world.envs.envs[i]
             env_init = {k: v[i] for k, v in merged.items()}
-            apply_callables(world.envs.envs[i].unwrapped, callables, env_init)
+            apply_callables(world_env.unwrapped, callables, env_init)
+            current = world_env
+            background_configured = False
+            while current is not current.unwrapped:
+                if isinstance(current, ReacherRenderShiftWrapper):
+                    current.configure_background(episodes_idx[i], start_steps[i])
+                    background_configured = True
+                    break
+                current = current.env
+            if is_dcs_variant(variant) and not background_configured:
+                raise RuntimeError("DCS render wrapper was not found in environment")
 
     shape_prefix = world.infos["pixels"].shape[:2]
     for src in (init_state, goal_state):
@@ -346,15 +448,26 @@ def build_policy(args, dataset, model, device):
 def main() -> None:
     args = parse_args()
     cache_dir = resolve_cache_dir(args.cache_dir)
-    dataset = swm.data.HDF5Dataset(
-        args.dataset_name, keys_to_cache=["action"], cache_dir=cache_dir
+    dataset = swm.data.load_dataset(
+        args.dataset_name, keys_to_cache=["action"], cache_dir=str(cache_dir)
     )
     row_indices, episodes_idx, start_steps = sample_eval_points(
-        dataset, args.seed, args.num_eval, args.goal_offset_steps
+        dataset,
+        args.seed,
+        args.num_eval,
+        args.goal_offset_steps,
+        episode_min=args.episode_min,
+        episode_max=args.episode_max,
     )
 
     model = swm.wm.utils.load_pretrained(args.policy)
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = (
+        "cuda"
+        if torch.cuda.is_available()
+        else "mps"
+        if torch.backends.mps.is_available()
+        else "cpu"
+    )
     model = model.to(device).eval()
     model.requires_grad_(False)
     model.interpolate_pos_encoding = True
@@ -387,7 +500,17 @@ def main() -> None:
         "row_indices": [int(x) for x in row_indices],
         "episodes_idx": [int(x) for x in episodes_idx],
         "start_steps": [int(x) for x in start_steps],
+        "background": (
+            DavisBearBackground(
+                args.background_video,
+                dynamic="dcs_bear_dynamic" in args.variants,
+                seed=args.background_seed,
+            ).metadata()
+            if any(is_dcs_variant(variant) for variant in args.variants)
+            else None
+        ),
         "protocol": {
+            "episode_range": [args.episode_min, args.episode_max],
             "goal_offset_steps": args.goal_offset_steps,
             "eval_budget": args.eval_budget,
             "horizon": args.horizon,
@@ -406,7 +529,11 @@ def main() -> None:
         start_time = time.time()
         policy = build_policy(args, dataset, model, device)
         world = make_world(
-            variant, args.num_eval, max_episode_steps=2 * args.eval_budget
+            variant,
+            args.num_eval,
+            max_episode_steps=2 * args.eval_budget,
+            background_video=args.background_video,
+            background_seed=args.background_seed,
         )
         world.set_policy(policy)
         metrics = evaluate_shifted_from_dataset(
@@ -418,6 +545,8 @@ def main() -> None:
             eval_budget=args.eval_budget,
             callables=callables,
             variant=variant,
+            background_video=args.background_video,
+            background_seed=args.background_seed,
         )
         world.close()
         elapsed = time.time() - start_time

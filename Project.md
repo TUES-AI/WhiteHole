@@ -3,11 +3,11 @@
 
 WhiteHole is early exploratory research on adapting JEPA representations and latent world models under observation shift.
 No final architecture, objective, adapter placement, benchmark, or paper claim has been selected.
-Current work is intended to establish what works, what fails, and which diagnostics predict downstream behavior.
+MoVie is now the primary methodological starting point; the exact JEPA adaptation method and claim remain open.
 
 ## Research question
 
-Can a small trainable module make shifted observations usable by a pretrained or frozen JEPA without destroying useful latent geometry or control behavior?
+How should MoVie's frozen-dynamics test-time adaptation principle be transferred to JEPA world models without destroying useful latent geometry or control behavior?
 The main variables are the backbone, adapter architecture, adapter placement, supervision, loss, data budget, and shift type.
 A successful method should retain source-domain behavior, generalize beyond its training transformations, and use materially fewer trainable parameters or samples than full fine-tuning.
 
@@ -31,10 +31,10 @@ Evaluate held-out transformations and severities, clean retention, retrieval, fe
 
 ### Action-conditioned environments
 
-Start with Reacher camera rotation and translation, then random per-episode poses and cameras that move within an episode.
-Render source and target cameras from the same simulator state when paired supervision is needed.
-Measure one- and multi-step prediction, state probes, source-coordinate alignment, and closed-loop control or MPC.
-Treat occlusion and partial observability as possible limits of framewise adaptation, not implementation details to hide.
+Reproduce MoVie's frozen-dynamics adaptation logic on Reacher, then compare it with JEPA-specific adapters.
+Use Distracting Control Suite camera, color, DAVIS-background, and composed shifts in both static and within-episode dynamic settings.
+Compare spatial transformers, generic input adapters, latent adapters, and controlled encoder/predictor updates.
+Measure severity extrapolation, held-out backgrounds, source-coordinate alignment, and closed-loop control or MPC.
 
 ### Reference environments
 
@@ -60,14 +60,14 @@ Easy invertible appearance shifts are calibration checks; they are not evidence 
 - [LeWorldModel](docs/paper_summaries/summary_2603.19312_leworldmodel/summary.md) provides a compact end-to-end JEPA world-model baseline and emphasizes planning evaluation.
 - [PLDM](docs/paper_summaries/summary_2502.14819_pldm/summary.md) supplies reference environments, objectives, and reward-free planning comparisons.
 - [Image World Models](docs/paper_summaries/summary_2403.00504_image-world-models/summary.md) studies transformation-conditioned latent prediction and predictor reuse.
-- [MoVie](docs/paper_summaries/summary_2307.00972_movie/summary.md) is a close precedent for reward-free perception adaptation with frozen dynamics and control.
-- [AdaJEPA](docs/paper_summaries/summary_2606.32026_adajepa/summary.md) provides an online fine-tuning comparison across encoder, predictor, and LoRA placements.
-
+- [MoVie](docs/paper_summaries/summary_2307.00972_movie/summary.md) is the primary adaptation precedent; [Distracting Control](docs/paper_summaries/summary_2101.02722_distracting-control-suite/summary.md) supplies the multi-axis benchmark.
+- [SCMA](https://arxiv.org/abs/2502.09923) broadens this line with a policy-agnostic image denoiser and a frozen generative world model.
+- [AdaJEPA](docs/paper_summaries/summary_2606.32026_adajepa/summary.md) is the closest JEPA-specific online adaptation comparison, but updates the world model itself.
 ## Near-term work
 A matched offline MoVie-style Reacher ablation now separates visual adaptation scope from preservation objectives while freezing LeWM dynamics and control. On 100 identical starts, unadapted LeWM scores 85% on source and 35% on hard camera. Full STN+encoder+projector adaptation scores 78%/75%; STN-only scores 77%/82%; STN+encoder with a frozen projector scores 80%/73%; adding source identity to the full update scores 83%/70%; and adding source-relative latent, predicted-transition, and joint SWD preservation scores 80%/78%.
 The current best hard-camera point estimate is therefore the 83,372-parameter STN-only adapter. Updating the encoder reduced hard-camera success by 9 points relative to STN-only on paired starts (95% bootstrap CI -17 to -1; exact McNemar `p=0.049`) despite improving held-out one-step dynamics MSE. Distribution preservation recovered most of that downstream loss and gave a balanced 80%/78% source/hard result, but did not statistically separate from STN-only at 100 cases. Direct source identity preserved source behavior best but traded away target success.
-These are promising controlled results, not yet a faithful online MoVie reproduction: training uses a fixed target-transition buffer before evaluation rather than interactions inside the control loop. All adapted rows also use one training seed and one regularization setting.
-Next repeat the STN-only, full-update, and SWD rows over multiple training seeds; sweep SWD strength around the current `0.05/0.1/0.1` setting; isolate RGB-input versus patch-grid STN placement; and then separate adaptation interactions from final evaluation.
-Retain the medium-shift full-encoder result as a historical comparison rather than a MoVie result.
-Use PLDM environments only where they isolate a scientific question more cleanly than the main tracks.
+A harder dynamic Distracting Control test places the DAVIS `bear` sequence in Reacher's MuJoCo sky texture. With adaptation and evaluation separated by episode, unadapted source/bear success was 82%/18%. Full visual adaptation, STN-only, and STNs+encoder scored 13%/9%, 6%/16%, and 13%/8%: all reduced bear one-step dynamics MSE, none recovered bear control, and all destroyed source control. This establishes the tested affine MoVie adapter as a useful negative-control ablation for semantic dynamic backgrounds; it does not establish universal MoVie failure.
+Both adaptation experiments use fixed target-transition buffers before evaluation rather than interaction-coupled online MoVie, and each adapted row has one training seed. The bear run also uses a newly collected internally matched random-policy dataset because the collaborator's private cache was unavailable.
+Next test a non-affine image-to-image residual or denoising adapter, with SCMA as the strongest methodological reference, against the same bear starts and budget. Add a static-bear diagnostic to separate semantic clutter from temporal motion, then repeat the competitive rows over adaptation seeds. Defer the two source-preservation bear rows until an adapter demonstrates target recovery; preservation alone cannot resolve the observed target failure.
+Retain the medium-shift full-encoder result as a historical comparison rather than a MoVie result, and keep frozen I-JEPA and PLDM as controlled diagnostic tracks.
 Do not claim general adaptation, architectural novelty, or a final method until repeated downstream evidence supports it.

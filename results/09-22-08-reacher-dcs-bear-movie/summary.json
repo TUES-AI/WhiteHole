@@ -1,0 +1,184 @@
+{
+  "experiment": "Reacher DAVIS bear dynamic-background MoVie scope ablation",
+  "repository_head": "3279d92c9810dcf5b28bb875fa9385777d57f34a",
+  "evidence": "Executed on the GPU pod from uncommitted experiment code layered on repository_head.",
+  "rows": {
+    "unadapted": {
+      "trainable_parameters": 0,
+      "bear_val_dynamics_mse": 0.2731451839208603,
+      "source_val_dynamics_mse": 0.0650346428155899,
+      "source_success": 82,
+      "bear_dynamic_success": 18
+    },
+    "full": {
+      "trainable_parameters": 6377516,
+      "bear_val_dynamics_mse": 0.1169169619679451,
+      "source_val_dynamics_mse": 0.22033283859491348,
+      "frozen_core_grad_tensors": 0,
+      "encoder_rms_drift": 3.6039124976182565e-05,
+      "projector_rms_drift": 3.592776027961262e-05,
+      "source_success": 13,
+      "bear_dynamic_success": 9
+    },
+    "stn_only": {
+      "trainable_parameters": 83372,
+      "bear_val_dynamics_mse": 0.1975141242146492,
+      "source_val_dynamics_mse": 0.26145554333925247,
+      "frozen_core_grad_tensors": 0,
+      "encoder_rms_drift": 0.0,
+      "projector_rms_drift": 0.0,
+      "source_success": 6,
+      "bear_dynamic_success": 16
+    },
+    "stn_encoder": {
+      "trainable_parameters": 5584748,
+      "bear_val_dynamics_mse": 0.13824084401130676,
+      "source_val_dynamics_mse": 0.21681898087263107,
+      "frozen_core_grad_tensors": 0,
+      "encoder_rms_drift": 3.756695591239013e-05,
+      "projector_rms_drift": 0.0,
+      "source_success": 13,
+      "bear_dynamic_success": 8
+    }
+  },
+  "paired_against_unadapted": {
+    "source": {
+      "full": {
+        "difference_percentage_points": -69.0,
+        "bootstrap_95_ci_percentage_points": [
+          -78.0,
+          -59.0
+        ],
+        "gains": 1,
+        "losses": 70,
+        "exact_mcnemar_p": 6.098637220230962e-20
+      },
+      "stn_only": {
+        "difference_percentage_points": -76.0,
+        "bootstrap_95_ci_percentage_points": [
+          -84.0,
+          -67.0
+        ],
+        "gains": 1,
+        "losses": 77,
+        "exact_mcnemar_p": 5.227781471335135e-22
+      },
+      "stn_encoder": {
+        "difference_percentage_points": -69.0,
+        "bootstrap_95_ci_percentage_points": [
+          -78.0,
+          -59.0
+        ],
+        "gains": 1,
+        "losses": 70,
+        "exact_mcnemar_p": 6.098637220230962e-20
+      }
+    },
+    "dcs_bear_dynamic": {
+      "full": {
+        "difference_percentage_points": -9.0,
+        "bootstrap_95_ci_percentage_points": [
+          -18.0,
+          0.0
+        ],
+        "gains": 7,
+        "losses": 16,
+        "exact_mcnemar_p": 0.0931396484375
+      },
+      "stn_only": {
+        "difference_percentage_points": -2.0,
+        "bootstrap_95_ci_percentage_points": [
+          -11.0,
+          7.000000000000001
+        ],
+        "gains": 10,
+        "losses": 12,
+        "exact_mcnemar_p": 0.8318119049072266
+      },
+      "stn_encoder": {
+        "difference_percentage_points": -10.0,
+        "bootstrap_95_ci_percentage_points": [
+          -19.0,
+          -1.0
+        ],
+        "gains": 6,
+        "losses": 16,
+        "exact_mcnemar_p": 0.052478790283203125
+      }
+    }
+  },
+  "training": {
+    "seed": 123,
+    "episode_range": [
+      0,
+      127
+    ],
+    "train_transitions": 256,
+    "validation_transitions": 64,
+    "epochs": 64,
+    "batch_size": 32,
+    "optimizer_updates": 512,
+    "objective": "one-step frozen-dynamics MSE",
+    "offline_fixed_buffer": true
+  },
+  "evaluation": {
+    "seed": 42,
+    "episode_range": [
+      128,
+      255
+    ],
+    "cases": 100,
+    "same_row_indices_across_rows": true,
+    "disjoint_from_adaptation_episodes": true,
+    "goal_offset_steps": 25,
+    "eval_budget": 50,
+    "horizon": 5,
+    "receding_horizon": 5,
+    "action_block": 5,
+    "num_samples": 300,
+    "cem_steps": 30,
+    "topk": 30
+  },
+  "background": {
+    "video_path": "/proj/data/reacher-dcs-bear/bear_raw_24fps.mp4",
+    "video_filename": "bear_raw_24fps.mp4",
+    "sha256": "46f05e52f884a5180cd44ee0448e461fc744f2665e0ae5215e2d52ba1fac28bd",
+    "bytes": 2015436,
+    "frame_count": 82,
+    "resolution": [
+      854,
+      480
+    ],
+    "fps": 24.0,
+    "dynamic": true,
+    "seed": 0,
+    "ground_plane_alpha": 0.0,
+    "sky_texture_height": 800,
+    "source": "https://huggingface.co/datasets/emirkisa/DAVIS-2017-480p-mp4/resolve/872ccd3c5d4d9c98016798e7af0342b33ec6ab4d/bear_raw_24fps.mp4"
+  },
+  "dataset": {
+    "path": "/proj/data/reacher-dcs-bear/reacher_random_states.h5",
+    "sha256": "5d405963441f161fbede306996dda85bc5f69a1f69c1cca5be762ab32f4ed5e2",
+    "collection": "256 episodes x 200 steps, uniform random actions, seed 3072; compact qpos/qvel/action dataset collected because dmc/reacher_random was not publicly accessible",
+    "same_for_all_rows": true
+  },
+  "base_checkpoint": {
+    "repo": "quentinll/lewm-reacher",
+    "config_sha256": "2564086e961e7b5c7c04dffc451091115b389a590645ff19653c64fd0bc16e09",
+    "weights_sha256": "eb70b1fd5409f8f81875d62f5ee5a20dd220a3128a477de66b5760f475f0f469"
+  },
+  "checkpoint_sha256": {
+    "full": "1beb11e0c961c78e4f0f469fdc79ee7b89c9569fca6bc1fb0b1e9fb0ce97dcad",
+    "stn_only": "0e39e8c16254e9c441dd88f9857d2426500fb584e400c2df59c684018d0ab55f",
+    "stn_encoder": "8d262424b9393bb6bea53f40d18b9ce13c0208cd6f539347722acb0fbed2f505"
+  },
+  "limitations": [
+    "one adaptation seed",
+    "offline pre-adaptation rather than online MoVie",
+    "one DAVIS sequence",
+    "dynamic background only; static not evaluated",
+    "new random-state dataset rather than collaborator private cache",
+    "CUDA execution was seeded but deterministic algorithms were not forced"
+  ],
+  "interpretation": "All adapters reduced bear one-step MSE but none improved bear closed-loop control; all catastrophically damaged source control. This supports STN/MoVie insufficiency for this tested shift and budget, not a universal impossibility claim."
+}

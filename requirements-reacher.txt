@@ -1,6 +1,13 @@
-# Compatible with the solver API used by the Reacher scripts.
+# Versions used by the Reacher DAVIS-background experiment.
+# On Python 3.13 GeneralContainer, run scripts/setup_reacher_gpu.sh instead.
 stable-worldmodel==0.1.1
-stable-pretraining>=0.1.7
-scikit-learn
-opencv-python-headless
-dm-control
+stable-pretraining==0.1.8
+transformers==4.57.6
+scikit-learn==1.9.0
+opencv-python-headless==4.14.0.94
+imageio==2.37.4
+imageio-ffmpeg==0.6.0
+h5py==3.16.0
+hdf5plugin==7.0.0
+huggingface-hub==0.36.2
+dm-control==1.0.44
