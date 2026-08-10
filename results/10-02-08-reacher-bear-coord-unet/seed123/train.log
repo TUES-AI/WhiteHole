@@ -1,0 +1,23 @@
+/opt/venv/lib/python3.13/site-packages/stable_worldmodel/envs/__init__.py:215: UserWarning: ale-py not found; ALE/* envs are unavailable. Install with: pip install 'stable-worldmodel[env]' or pip install ale-py.
+  from stable_worldmodel.envs import ale  # noqa: F401
+23:46:59 | INFO  | __init__.py | Cached 'action' from '/proj/data/reacher-conv/reacher_random_states.h5'
+Rendering 320 dcs_bear_dynamic start/next transitions...
+23:47:03 | INFO  | __init__.py | JAX version 0.11.0 available.
+23:47:04 | INFO  | atomic_chec~| [atomic_save] installed crash-safe checkpoint plugin (write to sibling .tmp + fsync + atomic rename)
+23:47:09 | INFO  | utils.py    | Loading quentinll/lewm-reacher from local cache...
+23:47:09 | INFO  | utils.py    | Loading checkpoint from folder /root/.stable_worldmodel/checkpoints/models--quentinll--lewm-reacher...
+23:47:09 | INFO  | utils.py    | Created ViT-tiny from scratch with config: {'hidden_size': 192, 'num_hidden_layers': 12, 'num_attention_heads': 3, 'intermediate_size': 768, 'image_size': 224, 'patch_size': 14}
+baseline_target=0.273144 baseline_source=0.065049 adapter_params=97731 frozen_core_grads=0
+epoch 001 train_dyn=0.292068 val_dyn=0.271160 val_loss=11.458554 residual=0.008821
+epoch 008 train_dyn=0.244188 val_dyn=0.237123 val_loss=7.562348 residual=0.371864
+epoch 016 train_dyn=0.244818 val_dyn=0.239552 val_loss=4.237296 residual=0.634553
+epoch 024 train_dyn=0.219691 val_dyn=0.206001 val_loss=3.577606 residual=0.654841
+epoch 032 train_dyn=0.210566 val_dyn=0.187438 val_loss=3.004986 residual=0.691938
+epoch 040 train_dyn=0.166391 val_dyn=0.171979 val_loss=2.734592 residual=0.696391
+epoch 048 train_dyn=0.151088 val_dyn=0.152942 val_loss=2.436664 residual=0.703244
+epoch 056 train_dyn=0.147354 val_dyn=0.175352 val_loss=2.280992 residual=0.723684
+epoch 064 train_dyn=0.150074 val_dyn=0.154359 val_loss=2.043900 residual=0.708142
+best_val_objective: 2.043900
+final_target_dynamics: 0.154359
+final_source_dynamics: 0.066622
+wrote: /proj/data/reacher-conv/experiment/coord_unet_pixel10/adapter_latest.ckpt

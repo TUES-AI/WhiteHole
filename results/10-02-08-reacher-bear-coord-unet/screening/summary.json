@@ -1,0 +1,56 @@
+{
+  "cases": 30,
+  "seed": 42,
+  "episodes_used": [
+    138,
+    139,
+    140,
+    144,
+    151,
+    153,
+    175,
+    179,
+    183,
+    184,
+    185,
+    192,
+    193,
+    195,
+    197,
+    210,
+    211,
+    217,
+    219,
+    222,
+    225,
+    226,
+    228,
+    233,
+    235,
+    237,
+    246,
+    252
+  ],
+  "rows": {
+    "unanchored_residual_cnn": {
+      "source": 4,
+      "bear": 3
+    },
+    "source_anchored_residual_cnn": {
+      "source": 24,
+      "bear": 3
+    },
+    "paired_residual_cnn": {
+      "source": 26,
+      "bear": 5
+    },
+    "paired_coord_unet_pixel_weight_1": {
+      "source": 26,
+      "bear": 1
+    },
+    "paired_coord_unet_pixel_weight_10": {
+      "source": 26,
+      "bear": 10
+    }
+  }
+}

@@ -35,7 +35,7 @@ from scripts.visualize_reacher_shifts import (
     render_variant,
     set_hard_camera,
 )
-from scripts.reacher_conv_adapter import AdaptedLeWM, SmallConvAdapter
+from scripts.reacher_conv_adapter import AdaptedLeWM, build_input_adapter
 from scripts.reacher_movie_adapter import build_movie_encoder
 
 
@@ -126,6 +126,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--background-seed", type=int, default=0)
     parser.add_argument("--episode-min", type=int, default=None)
     parser.add_argument("--episode-max", type=int, default=None)
+    parser.add_argument("--exclude-episodes", nargs="*", type=int, default=[])
     return parser.parse_args()
 
 
@@ -154,11 +155,7 @@ def load_adapter_model(model, checkpoint_path: str | None, device: str):
     if cfg.get("type", "conv") != "conv":
         raise ValueError(f"Unknown adapter checkpoint type: {cfg.get('type')!r}")
 
-    adapter = SmallConvAdapter(
-        channels=int(cfg.get("channels", 16)),
-        depth=int(cfg.get("depth", 2)),
-        residual_scale=float(cfg.get("residual_scale", 1.0)),
-    ).to(device)
+    adapter = build_input_adapter(cfg).to(device)
     adapter.load_state_dict(checkpoint["adapter_state_dict"], strict=True)
     adapter.eval()
     adapter.requires_grad_(False)
@@ -200,6 +197,7 @@ def sample_eval_points(
     goal_offset_steps: int,
     episode_min: int | None = None,
     episode_max: int | None = None,
+    exclude_episodes: list[int] | None = None,
 ):
     col_name = "episode_idx" if "episode_idx" in dataset.column_names else "ep_idx"
     ep_indices, _ = np.unique(dataset.get_col_data(col_name), return_index=True)
@@ -217,6 +215,8 @@ def sample_eval_points(
         valid_mask &= row_episodes >= episode_min
     if episode_max is not None:
         valid_mask &= row_episodes <= episode_max
+    if exclude_episodes:
+        valid_mask &= ~np.isin(row_episodes, exclude_episodes)
     valid_indices = np.nonzero(valid_mask)[0]
 
     rng = np.random.default_rng(seed)
@@ -458,6 +458,7 @@ def main() -> None:
         args.goal_offset_steps,
         episode_min=args.episode_min,
         episode_max=args.episode_max,
+        exclude_episodes=args.exclude_episodes,
     )
 
     model = swm.wm.utils.load_pretrained(args.policy)
@@ -511,6 +512,7 @@ def main() -> None:
         ),
         "protocol": {
             "episode_range": [args.episode_min, args.episode_max],
+            "excluded_episodes": args.exclude_episodes,
             "goal_offset_steps": args.goal_offset_steps,
             "eval_budget": args.eval_budget,
             "horizon": args.horizon,

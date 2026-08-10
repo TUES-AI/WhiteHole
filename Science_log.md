@@ -65,3 +65,17 @@ Experiment description: Replaced Reacher's MuJoCo sky texture with deterministic
 The dynamic bear background created a 64-point unadapted source-to-target drop. Relative to unadapted bear control, the full, STN-only, and STN+encoder rows changed success by -9 points (95% paired bootstrap CI -18 to 0; exact `p=0.093`), -2 (-11 to +7; `p=0.832`), and -10 (-19 to -1; `p=0.052`). Every adaptation lowered bear one-step MSE but failed to recover control and reduced source success by 69-76 points. Frozen-core gradient tensors were zero. This is a difficult negative result for the tested offline MoVie-style adapters and budget, not proof that all MoVie-derived methods must fail. Limitations: one training seed, one dynamic video, no static-background row, and a new internally matched dataset rather than the collaborator's private cache.
 
 ---
+
+10-02-08 | Reacher dynamic bear coordinate-U-Net upper bound
+Experiment description: Trained a 97,731-parameter identity-initialized coordinate-aware residual U-Net before fully frozen LeWM perception/dynamics/control. Training used episodes 0-127, 256 transitions, 64 validation transitions, 512 updates, and seeds 123/124. Screening showed that target-only dynamics consistency and source preservation did not recover bear control; the successful objective adds exact paired source-latent alignment and source-pixel reconstruction at weights 1 and 10, plus source latent/pixel identity at weights 1/1. Final evaluation used 100 matched starts after excluding all 28 episode IDs encountered during hyperparameter screening. Code was executed from uncommitted changes layered on `2be2600`; result folder: `results/10-02-08-reacher-bear-coord-unet/`.
+
+| Condition | Parameters | Bear val dynamics MSE | Source | Dynamic bear |
+|---|---:|---:|---:|---:|
+| Unadapted LeWM | 0 | — | 73/100 | 19/100 |
+| STN-only | 83,372 | — | 16/100 | 10/100 |
+| Coordinate U-Net, seed 123 | 97,731 | `0.1544` | 80/100 | 29/100 |
+| Coordinate U-Net, seed 124 | 97,731 | `0.1762` | **86/100** | **35/100** |
+
+Seed 123 improved bear success over STN-only by 19 points (95% paired bootstrap CI +8 to +30; exact `p=0.0013`). Seed 124 improved it by 25 points (+14 to +36; `p=7.0e-5`) and beat unadapted bear success by 16 points (+4 to +28; `p=0.0139`). Two-seed means were 83% source and 32% bear. Frozen-core gradient tensors were zero. This establishes a small non-affine adapter capacity upper bound, not a target-only adaptation solution: the successful loss requires exact source renders and strong pixel supervision unavailable in ordinary deployment. The target-only 83,052-parameter residual CNN screened at 3/30 bear success despite very low dynamics MSE.
+
+---

@@ -1,0 +1,285 @@
+{
+  "experiment": "Coordinate-aware residual U-Net on dynamic DAVIS bear Reacher",
+  "repository_base": "2be2600",
+  "method_status": "paired-source upper bound, not target-only test-time adaptation",
+  "rows": {
+    "unadapted": {
+      "trainable_parameters": 0,
+      "source_success": 73,
+      "bear_success": 19
+    },
+    "stn_only": {
+      "trainable_parameters": 83372,
+      "source_success": 16,
+      "bear_success": 10
+    },
+    "coord_unet_seed_123": {
+      "trainable_parameters": 97731,
+      "target_val_dynamics_mse": 0.1543591246008873,
+      "source_val_dynamics_mse": 0.06662158481776714,
+      "source_latent_identity_mse": 0.0038090363959781826,
+      "source_success": 80,
+      "bear_success": 29
+    },
+    "coord_unet_seed_124": {
+      "trainable_parameters": 97731,
+      "target_val_dynamics_mse": 0.17615444958209991,
+      "source_val_dynamics_mse": 0.08102236315608025,
+      "source_latent_identity_mse": 0.0006806018500356004,
+      "source_success": 86,
+      "bear_success": 35
+    }
+  },
+  "two_seed_mean": {
+    "source_success": 83.0,
+    "bear_success": 32.0
+  },
+  "paired_statistics": {
+    "coord_unet_seed_123": {
+      "vs_unadapted": {
+        "source": {
+          "difference_percentage_points": 7.000000000000001,
+          "bootstrap_95_ci_percentage_points": [
+            -3.0,
+            17.0
+          ],
+          "gains": 16,
+          "losses": 9,
+          "exact_mcnemar_p": 0.2295229434967041
+        },
+        "dcs_bear_dynamic": {
+          "difference_percentage_points": 10.0,
+          "bootstrap_95_ci_percentage_points": [
+            -2.0,
+            22.0
+          ],
+          "gains": 23,
+          "losses": 13,
+          "exact_mcnemar_p": 0.13249816396273675
+        }
+      },
+      "vs_stn_only": {
+        "source": {
+          "difference_percentage_points": 64.0,
+          "bootstrap_95_ci_percentage_points": [
+            54.0,
+            74.0
+          ],
+          "gains": 66,
+          "losses": 2,
+          "exact_mcnemar_p": 1.5903890617646743e-17
+        },
+        "dcs_bear_dynamic": {
+          "difference_percentage_points": 19.0,
+          "bootstrap_95_ci_percentage_points": [
+            8.0,
+            30.0
+          ],
+          "gains": 26,
+          "losses": 7,
+          "exact_mcnemar_p": 0.0013187271542847157
+        }
+      }
+    },
+    "coord_unet_seed_124": {
+      "vs_unadapted": {
+        "source": {
+          "difference_percentage_points": 13.0,
+          "bootstrap_95_ci_percentage_points": [
+            3.0,
+            23.0
+          ],
+          "gains": 20,
+          "losses": 7,
+          "exact_mcnemar_p": 0.0191572904586792
+        },
+        "dcs_bear_dynamic": {
+          "difference_percentage_points": 16.0,
+          "bootstrap_95_ci_percentage_points": [
+            4.0,
+            28.000000000000004
+          ],
+          "gains": 27,
+          "losses": 11,
+          "exact_mcnemar_p": 0.013852965261321515
+        }
+      },
+      "vs_stn_only": {
+        "source": {
+          "difference_percentage_points": 70.0,
+          "bootstrap_95_ci_percentage_points": [
+            59.0,
+            80.0
+          ],
+          "gains": 74,
+          "losses": 4,
+          "exact_mcnemar_p": 9.9631125455154e-18
+        },
+        "dcs_bear_dynamic": {
+          "difference_percentage_points": 25.0,
+          "bootstrap_95_ci_percentage_points": [
+            14.000000000000002,
+            36.0
+          ],
+          "gains": 32,
+          "losses": 7,
+          "exact_mcnemar_p": 7.025478407740593e-05
+        }
+      }
+    }
+  },
+  "architecture": {
+    "type": "identity-residual coordinate-aware U-Net",
+    "base_channels": 16,
+    "trainable_parameters": 97731,
+    "stn_parameter_ratio": 1.172228086168018
+  },
+  "training": {
+    "seeds": [
+      123,
+      124
+    ],
+    "episode_range": [
+      0,
+      127
+    ],
+    "train_transitions": 256,
+    "validation_transitions": 64,
+    "optimizer_updates": 512,
+    "batch_size": 32,
+    "loss_weights": {
+      "frozen_dynamics": 1.0,
+      "paired_target_source_latent": 1.0,
+      "paired_target_source_pixel": 10.0,
+      "source_latent_identity": 1.0,
+      "source_pixel_identity": 1.0
+    }
+  },
+  "screening": {
+    "cases": 30,
+    "seed": 42,
+    "episodes_used": [
+      138,
+      139,
+      140,
+      144,
+      151,
+      153,
+      175,
+      179,
+      183,
+      184,
+      185,
+      192,
+      193,
+      195,
+      197,
+      210,
+      211,
+      217,
+      219,
+      222,
+      225,
+      226,
+      228,
+      233,
+      235,
+      237,
+      246,
+      252
+    ],
+    "rows": {
+      "unanchored_residual_cnn": {
+        "source": 4,
+        "bear": 3
+      },
+      "source_anchored_residual_cnn": {
+        "source": 24,
+        "bear": 3
+      },
+      "paired_residual_cnn": {
+        "source": 26,
+        "bear": 5
+      },
+      "paired_coord_unet_pixel_weight_1": {
+        "source": 26,
+        "bear": 1
+      },
+      "paired_coord_unet_pixel_weight_10": {
+        "source": 26,
+        "bear": 10
+      }
+    }
+  },
+  "final_evaluation": {
+    "cases": 100,
+    "seed": 4242,
+    "episode_range": [
+      128,
+      255
+    ],
+    "excluded_screening_episodes": [
+      138,
+      139,
+      140,
+      144,
+      151,
+      153,
+      175,
+      179,
+      183,
+      184,
+      185,
+      192,
+      193,
+      195,
+      197,
+      210,
+      211,
+      217,
+      219,
+      222,
+      225,
+      226,
+      228,
+      233,
+      235,
+      237,
+      246,
+      252
+    ],
+    "zero_screening_row_overlap": true,
+    "same_rows_all_conditions": true,
+    "goal_offset_steps": 25,
+    "eval_budget": 50,
+    "horizon": 5,
+    "receding_horizon": 5,
+    "action_block": 5,
+    "num_samples": 300,
+    "cem_steps": 30,
+    "topk": 30
+  },
+  "dataset": {
+    "sha256": "5d405963441f161fbede306996dda85bc5f69a1f69c1cca5be762ab32f4ed5e2"
+  },
+  "background": {
+    "sha256": "46f05e52f884a5180cd44ee0448e461fc744f2665e0ae5215e2d52ba1fac28bd",
+    "filename": "bear_raw_24fps.mp4"
+  },
+  "checkpoint_sha256": {
+    "seed_123": "bb15e84de6298ffd76d216c58e733cded99ffd3e8d6706dc7a316251764d5ba0",
+    "seed_124": "737f582eaa7ab8a996f630f961a989963fc052a57c8d3e6634508b4470d87f51"
+  },
+  "base_checkpoint": {
+    "config_sha256": "2564086e961e7b5c7c04dffc451091115b389a590645ff19653c64fd0bc16e09",
+    "weights_sha256": "eb70b1fd5409f8f81875d62f5ee5a20dd220a3128a477de66b5760f475f0f469"
+  },
+  "interpretation": "The near-parameter-matched U-Net beats STN-only on held-out bear control while retaining source control across two training seeds. Reward-free residual CNN screens failed; the successful objective uses exact paired source renders and is therefore an architecture/supervision upper bound, not the final adaptation method.",
+  "limitations": [
+    "two training seeds",
+    "paired source images and strong pixel supervision unavailable in ordinary test-time adaptation",
+    "one DAVIS video",
+    "hyperparameters selected on a 30-case screening set before episode-excluded final evaluation",
+    "new random-state dataset rather than collaborator private cache"
+  ]
+}
