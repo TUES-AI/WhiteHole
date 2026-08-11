@@ -1,0 +1,25 @@
+/opt/venv/lib/python3.13/site-packages/timm/models/layers/__init__.py:49: FutureWarning: Importing from timm.models.layers is deprecated, please import via timm.layers
+  warnings.warn(f"Importing from {__name__} is deprecated, please import via timm.layers", FutureWarning)
+/usr/lib/python3.13/contextlib.py:109: FutureWarning: `torch.backends.cuda.sdp_kernel()` is deprecated. In the future, this context manager will be removed. Please see `torch.nn.attention.sdpa_kernel()` for the new context manager, with updated signature.
+  self.gen = func(*args, **kwds)
+{
+  "status": "passed",
+  "gpu": "NVIDIA RTX A6000",
+  "seed": 20260811,
+  "adapter": "unet",
+  "shift": "rbg",
+  "objective": "target",
+  "steps": 1,
+  "last_train": {
+    "loss": 0.5852251052856445,
+    "primary": 0.5852251052856445,
+    "identity": 0.0,
+    "prediction": 0.4346633851528168,
+    "context": 0.30112338066101074,
+    "gradient_norm": 0.21626520156860352
+  },
+  "maximum_parameter_update": 9.999997564591467e-05,
+  "peak_cuda_bytes": 12875506176,
+  "train_seconds": 3.2942636013031006,
+  "frozen_core_gradient_tensors": 0
+}

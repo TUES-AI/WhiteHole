@@ -1,0 +1,92 @@
+/opt/venv/lib/python3.13/site-packages/timm/models/layers/__init__.py:49: FutureWarning: Importing from timm.models.layers is deprecated, please import via timm.layers
+  warnings.warn(f"Importing from {__name__} is deprecated, please import via timm.layers", FutureWarning)
+/usr/lib/python3.13/contextlib.py:109: FutureWarning: `torch.backends.cuda.sdp_kernel()` is deprecated. In the future, this context manager will be removed. Please see `torch.nn.attention.sdpa_kernel()` for the new context manager, with updated signature.
+  self.gen = func(*args, **kwds)
+/proj/project/scripts/train_vjepa_visual_adapters.py:321: UserWarning: Converting a tensor with requires_grad=True to a scalar may lead to unexpected behavior.
+Consider using tensor.detach() first. (Triggered internally at /pytorch/torch/csrc/autograd/generated/python_variable_methods.cpp:836.)
+  last = {"loss": float(loss), "primary": float(primary), "identity": float(identity), "prediction": float(pred), "context": float(context), "gradient_norm": float(grad_norm)}
+{
+  "protocol": "V-JEPA 2.1 ViT-B framewise visual adapter screen",
+  "gpu": "NVIDIA RTX A6000",
+  "seed": 20260811,
+  "classes": [
+    "archery",
+    "bowling",
+    "flying_kite",
+    "high_jump",
+    "marching"
+  ],
+  "split_counts": {
+    "probe": 25,
+    "adapt": 15,
+    "source_prior": 10,
+    "capacity": 25,
+    "eval": 25
+  },
+  "student_checkpoint": {
+    "path": "/proj/checkpoints/vjepa2_1_vitb_dist_vitG_384.pt",
+    "sha256": "848a77c33cc9e6649ed2119c9bea1e2c569bcdab9539ff3e7c02ccc2959ddf4d"
+  },
+  "teacher_checkpoint": {
+    "path": "/proj/checkpoints/vjepa2_1_vitG_384.pt",
+    "sha256": "7aae1a3c7a31d258af9c985388b5d2f20587469380f2e11b54d7876ac8cfe58a"
+  },
+  "shift": "RGB to RBG, identically on every frame",
+  "fps": 4,
+  "frames": 16,
+  "crop_size": 384,
+  "budgets": {
+    "paired_steps": 1,
+    "jepa_steps": 1,
+    "paired_batch_size": 1,
+    "jepa_batch_size": 1
+  },
+  "baseline": {
+    "source_accuracy": 0.8399999737739563,
+    "target_accuracy": 0.7599999904632568,
+    "pixel_l1_to_source": 0.06339188247919082,
+    "vjepa_loss": 0.6064541339874268,
+    "prediction_loss": 0.45899879932403564,
+    "context_loss": 0.294910728931427,
+    "capacity_pixel_l1_to_source": 0.06125574745237827
+  },
+  "rows": [
+    {
+      "adapter": "unet",
+      "parameters": 97731,
+      "objective": "paired",
+      "steps": 1,
+      "last_train": {
+        "loss": 0.05117868259549141,
+        "primary": 0.05117868259549141,
+        "identity": 0.0,
+        "prediction": 0.0,
+        "context": 0.0,
+        "gradient_norm": 0.4656873047351837
+      },
+      "maximum_parameter_update": 0.00029999998514540493,
+      "peak_cuda_bytes": 11802053120,
+      "train_seconds": 0.5211074352264404,
+      "frozen_core_gradient_tensors": 0,
+      "source_accuracy": 0.8399999737739563,
+      "target_accuracy": 0.800000011920929,
+      "pixel_l1_to_source": 0.06348140217363835,
+      "vjepa_loss": 0.606060266494751,
+      "prediction_loss": 0.45871978998184204,
+      "context_loss": 0.29468098282814026,
+      "capacity_pixel_l1_to_source": 0.06153384730219841,
+      "capacity_pixel_gap_recovery": -0.004539979698008567,
+      "capacity_gate_pass": false
+    }
+  ],
+  "skipped_rows": [
+    {
+      "adapter": "unet",
+      "objective": "target",
+      "reason": "paired RBG capacity gate failed"
+    }
+  ],
+  "source_probe_accuracy": 0.8399999737739563,
+  "core_sentinel_max_drift": 0.0,
+  "wall_clock_seconds": 1.2925701141357422
+}

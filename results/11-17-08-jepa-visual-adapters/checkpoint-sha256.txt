@@ -1,0 +1,23 @@
+# Adapter checkpoints under /Volumes/SSD/whitehole/artifacts/11-jepa-visual-adapters
+1a4a7677ad15449ff651637e536ce2dec17023c4557ef6a99c1778ef49152eeb  /Volumes/SSD/whitehole/artifacts/11-jepa-visual-adapters/11-15-08-ijepa-visual-adapters/grid_color_affine_paired.ckpt
+f1f3e39b0b500590d5124ca54589e403be81e5dac71e77ac1268ea271d7d40a3  /Volumes/SSD/whitehole/artifacts/11-jepa-visual-adapters/11-15-08-ijepa-visual-adapters/grid_color_composed_paired.ckpt
+14fdb1a6fa29ff5803a1622b4ff43d2e469f39c0da11f4707f8cea8d1ffb4e5c  /Volumes/SSD/whitehole/artifacts/11-jepa-visual-adapters/11-15-08-ijepa-visual-adapters/grid_color_rbg_paired.ckpt
+ecbac26b1c12fed971cc0084621ce519616feb7c6dcf99fa2edb40babc7d2beb  /Volumes/SSD/whitehole/artifacts/11-jepa-visual-adapters/11-15-08-ijepa-visual-adapters/grid_color_rbg_source_prior.ckpt
+b2febecd2ea86cc9c485f8576ae26f10bb5d8a2c4ed52434dfad4efafcd202c8  /Volumes/SSD/whitehole/artifacts/11-jepa-visual-adapters/11-15-08-ijepa-visual-adapters/grid_color_rbg_target.ckpt
+81e1bb1ddfd0bc54ee384f470da46915689102b09f75a35b7c7f0299a8475f42  /Volumes/SSD/whitehole/artifacts/11-jepa-visual-adapters/11-15-08-ijepa-visual-adapters/unet_affine_paired.ckpt
+3c4784de57b90379ae22678f795c93d6ce9ce077b58378649550e4eb01524b81  /Volumes/SSD/whitehole/artifacts/11-jepa-visual-adapters/11-15-08-ijepa-visual-adapters/unet_composed_paired.ckpt
+43d605f3fc3eed8859e44da4d546538310c493faa67b6aee2a0d63773bce323a  /Volumes/SSD/whitehole/artifacts/11-jepa-visual-adapters/11-15-08-ijepa-visual-adapters/unet_rbg_paired.ckpt
+f7e9db7fe72e0fda506970ac6862b0f9643a02c685883c333d779fd0f5329918  /Volumes/SSD/whitehole/artifacts/11-jepa-visual-adapters/11-15-08-ijepa-visual-adapters/unet_rbg_source_prior.ckpt
+0b3ca713379b7b0d2234922aee1cc6e696ef44803186f1a9b31f72cf3a06c1c2  /Volumes/SSD/whitehole/artifacts/11-jepa-visual-adapters/11-15-08-ijepa-visual-adapters/unet_rbg_target.ckpt
+b4f709de455736e43cef2105bccf57b69061131150a1909716f04e5a1f40b738  /Volumes/SSD/whitehole/artifacts/11-jepa-visual-adapters/11-16-08-ijepa-fixed-visual-adapters/grid_color_affine_paired.ckpt
+ca505c9590b746ae720d9cee12497f68bfcce63d702b35e7dc909e41a213b646  /Volumes/SSD/whitehole/artifacts/11-jepa-visual-adapters/11-16-08-ijepa-fixed-visual-adapters/grid_color_composed_paired.ckpt
+1278bff576e13b5772c96078f9d24535874c6a88bdc693f291fcd173225e2c3b  /Volumes/SSD/whitehole/artifacts/11-jepa-visual-adapters/11-16-08-ijepa-fixed-visual-adapters/grid_color_rbg_paired.ckpt
+cc84837faf3bedeb76d482dc143054583617ef169af79074d5198ac55f8a2d87  /Volumes/SSD/whitehole/artifacts/11-jepa-visual-adapters/11-16-08-ijepa-fixed-visual-adapters/grid_color_rbg_source_prior.ckpt
+07ec776fceb0189f2aebac802043ce0c8e85e442174902009652ffd8cdf9c8de  /Volumes/SSD/whitehole/artifacts/11-jepa-visual-adapters/11-16-08-ijepa-fixed-visual-adapters/grid_color_rbg_target.ckpt
+ea564b5abfdda0e1af34b07ba5f4f3c599e1a105598f5ab2f72ad46f75a920cc  /Volumes/SSD/whitehole/artifacts/11-jepa-visual-adapters/11-16-08-ijepa-fixed-visual-adapters/unet_affine_paired.ckpt
+f54e76ed7c0e8703271a509772b5070a7531f2c2c65391357d7bb8f3c8dba760  /Volumes/SSD/whitehole/artifacts/11-jepa-visual-adapters/11-16-08-ijepa-fixed-visual-adapters/unet_composed_paired.ckpt
+ad66e5b00dc11de37369774d6144fb165250f7350b91c38c816a7e5ab005c8b4  /Volumes/SSD/whitehole/artifacts/11-jepa-visual-adapters/11-16-08-ijepa-fixed-visual-adapters/unet_rbg_paired.ckpt
+08fe86f1d8c37368aba40f2cc7c135fddb4d222468861e29e6879ffa8c6f818b  /Volumes/SSD/whitehole/artifacts/11-jepa-visual-adapters/11-16-08-ijepa-fixed-visual-adapters/unet_rbg_source_prior.ckpt
+845792a42bac7ae1da0f755ec499b6145da3e0b9b74c051144cf884e02ba4268  /Volumes/SSD/whitehole/artifacts/11-jepa-visual-adapters/11-16-08-ijepa-fixed-visual-adapters/unet_rbg_target.ckpt
+df4ef8c754351e7e8f33e7eadc1d1f3abf29d5ae2d81053faec8d0de669eac84  /Volumes/SSD/whitehole/artifacts/11-jepa-visual-adapters/11-17-08-vjepa-visual-adapters/grid_color-paired.ckpt
+e8b85c952a5aa1a2f251a088bfb0c704e76d32369f58f412ccf90203af6f8b4d  /Volumes/SSD/whitehole/artifacts/11-jepa-visual-adapters/11-17-08-vjepa-visual-adapters/unet-paired.ckpt

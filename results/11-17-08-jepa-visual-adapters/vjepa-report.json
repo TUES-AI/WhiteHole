@@ -1,0 +1,127 @@
+{
+  "protocol": "V-JEPA 2.1 ViT-B framewise visual adapter screen",
+  "gpu": "NVIDIA RTX A6000",
+  "seed": 20260811,
+  "classes": [
+    "archery",
+    "bowling",
+    "flying_kite",
+    "high_jump",
+    "marching"
+  ],
+  "split_counts": {
+    "probe": 25,
+    "adapt": 15,
+    "source_prior": 10,
+    "capacity": 25,
+    "eval": 25
+  },
+  "student_checkpoint": {
+    "path": "/proj/checkpoints/vjepa2_1_vitb_dist_vitG_384.pt",
+    "sha256": "848a77c33cc9e6649ed2119c9bea1e2c569bcdab9539ff3e7c02ccc2959ddf4d"
+  },
+  "teacher_checkpoint": {
+    "path": "/proj/checkpoints/vjepa2_1_vitG_384.pt",
+    "sha256": "7aae1a3c7a31d258af9c985388b5d2f20587469380f2e11b54d7876ac8cfe58a"
+  },
+  "shift": "RGB to RBG, identically on every frame",
+  "fps": 4,
+  "frames": 16,
+  "crop_size": 384,
+  "budgets": {
+    "paired_steps": 512,
+    "jepa_steps": 64,
+    "paired_batch_size": 1,
+    "jepa_batch_size": 1
+  },
+  "baseline": {
+    "source_accuracy": 0.8799999952316284,
+    "target_accuracy": 0.8799999952316284,
+    "pixel_l1_to_source": 0.06339188247919082,
+    "vjepa_loss": 0.5811294913291931,
+    "prediction_loss": 0.4379886269569397,
+    "context_loss": 0.28628174066543577,
+    "capacity_pixel_l1_to_source": 0.06125574745237827
+  },
+  "rows": [
+    {
+      "adapter": "unet",
+      "parameters": 97731,
+      "objective": "paired",
+      "steps": 512,
+      "last_train": {
+        "loss": 0.035504300147295,
+        "primary": 0.01361175812780857,
+        "identity": 0.021892542019486427,
+        "prediction": 0.0,
+        "context": 0.0,
+        "gradient_norm": 1.473655343055725
+      },
+      "maximum_parameter_update": 0.06545188277959824,
+      "peak_cuda_bytes": 11811288064,
+      "train_seconds": 58.18024921417236,
+      "frozen_core_gradient_tensors": 0,
+      "source_accuracy": 0.8799999952316284,
+      "target_accuracy": 0.8399999737739563,
+      "pixel_l1_to_source": 0.04405986063182354,
+      "vjepa_loss": 0.5818557739257812,
+      "prediction_loss": 0.4380734622478485,
+      "context_loss": 0.28756462931633,
+      "capacity_pixel_l1_to_source": 0.04341689668595791,
+      "capacity_pixel_gap_recovery": 0.29121921629131575,
+      "capacity_gate_pass": false
+    },
+    {
+      "adapter": "grid_color",
+      "parameters": 67009,
+      "objective": "paired",
+      "steps": 512,
+      "last_train": {
+        "loss": 0.04289974644780159,
+        "primary": 0.008684287779033184,
+        "identity": 0.03421545773744583,
+        "prediction": 0.0,
+        "context": 0.0,
+        "gradient_norm": 2.9651808738708496
+      },
+      "maximum_parameter_update": 0.058576855808496475,
+      "peak_cuda_bytes": 10606536192,
+      "train_seconds": 45.8628466129303,
+      "frozen_core_gradient_tensors": 0,
+      "source_accuracy": 0.8799999952316284,
+      "target_accuracy": 0.8799999952316284,
+      "pixel_l1_to_source": 0.03631017852574587,
+      "vjepa_loss": 0.5817490458488465,
+      "prediction_loss": 0.43798314929008486,
+      "context_loss": 0.28753178715705874,
+      "capacity_pixel_l1_to_source": 0.03788729701191187,
+      "capacity_pixel_gap_recovery": 0.38148992400482284,
+      "capacity_gate_pass": false
+    }
+  ],
+  "skipped_rows": [
+    {
+      "adapter": "unet",
+      "objective": "target",
+      "reason": "paired RBG capacity gate failed"
+    },
+    {
+      "adapter": "unet",
+      "objective": "source_prior",
+      "reason": "paired RBG capacity gate failed"
+    },
+    {
+      "adapter": "grid_color",
+      "objective": "target",
+      "reason": "paired RBG capacity gate failed"
+    },
+    {
+      "adapter": "grid_color",
+      "objective": "source_prior",
+      "reason": "paired RBG capacity gate failed"
+    }
+  ],
+  "source_probe_accuracy": 0.8799999952316284,
+  "core_sentinel_max_drift": 0.0,
+  "wall_clock_seconds": 360.5815279483795
+}

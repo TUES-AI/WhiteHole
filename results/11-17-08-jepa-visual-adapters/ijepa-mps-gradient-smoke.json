@@ -1,0 +1,11 @@
+{
+  "status": "passed",
+  "provenance": "Recorded from the interactive local real-checkpoint MPS smoke preceding the CUDA run.",
+  "device": "mps",
+  "checkpoint": "IN1K-vit.h.14-300e.pth.tar",
+  "objective": "masked I-JEPA",
+  "steps": 1,
+  "adapter_gradient_nonzero_and_finite": true,
+  "frozen_core_gradient_tensors": 0,
+  "core_sentinel_max_drift": 0.0
+}
